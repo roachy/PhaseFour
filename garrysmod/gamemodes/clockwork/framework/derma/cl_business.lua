@@ -1,5 +1,5 @@
 --[[
-	© 2014 CloudSixteen.com do not share, re-distribute or modify
+	Â© 2014 CloudSixteen.com do not share, re-distribute or modify
 	without permission of its author (kurozael@gmail.com).
 
 	Clockwork was created by Conna Wiles (also known as kurozael.)
@@ -19,10 +19,9 @@ function PANEL:Init()
 	self:SetSize(Clockwork.menu:GetWidth(), Clockwork.menu:GetHeight());
 	
 	self.panelList = vgui.Create("cwPanelList", self);
- 	self.panelList:SetPadding(2);
- 	self.panelList:SetSpacing(2);
- 	self.panelList:SizeToContents();
-	self.panelList:EnableVerticalScrollbar();
+ 	self.panelList:SetPadding(4);
+ 	self.panelList:SetSpacing(4);
+ 	self.panelList:StretchToParent(4, 4, 4, 4);
 	
 	self:Rebuild();
 end;
@@ -112,20 +111,14 @@ function PANEL:OnSelected() self:Rebuild(); end;
 
 -- Called when the layout should be performed.
 function PANEL:PerformLayout(w, h)
-	self.panelList:StretchToParent(4, 28, 4, 4);
-	self:SetSize(w, math.min(self.panelList.pnlCanvas:GetTall() + 32, ScrH() * 0.75));
+	--self.panelList:StretchToParent(4, 4, 4, 4);
+	--self:SetSize(w, math.min(self.panelList.pnlCanvas:GetTall() + 32, ScrH() * 0.75));
 end;
 
 -- Called when the panel is painted.
 function PANEL:Paint(w, h)
-	derma.SkinHook("Paint", "Frame", self, w, h);
-	
+	DERMA_SLICED_BG:Draw(0, 0, w, h, 8, COLOR_WHITE);
 	return true;
-end;
-
--- Called each frame.
-function PANEL:Think()
-	self:InvalidateLayout(true);
 end;
 
 vgui.Register("cwBusiness", PANEL, "EditablePanel");
@@ -134,7 +127,7 @@ local PANEL = {};
 
 -- Called when the panel is initialized.
 function PANEL:Init()
-	self:SetSize(self:GetParent():GetWide(), 32);
+	self:SetSize(self:GetParent():GetWide(), 40);
 	
 	local customData = self:GetParent().customData or {};
 	local toolTip = nil;
@@ -154,12 +147,14 @@ function PANEL:Init()
 	end;
 	
 	self.nameLabel = vgui.Create("DLabel", self);
-	self.nameLabel:SetPos(36, 2);
+	self.nameLabel:SetPos(48, 6);
+	self.nameLabel:SetDark(true);
 	self.nameLabel:SetText(customData.name);
 	self.nameLabel:SizeToContents();
 	
 	self.infoLabel = vgui.Create("DLabel", self);
-	self.infoLabel:SetPos(36, 2);
+	self.infoLabel:SetPos(48, 6);
+	self.infoLabel:SetDark(true);
 	self.infoLabel:SetText(customData.information);
 	self.infoLabel:SizeToContents();
 	
@@ -182,12 +177,18 @@ function PANEL:Init()
 	
 	self.spawnIcon:SetModel(customData.model, customData.skin);
 	self.spawnIcon:SetToolTip(toolTip);
-	self.spawnIcon:SetSize(32, 32);
+	self.spawnIcon:SetSize(40, 40);
+	self.spawnIcon:SetPos(0, 0);
+end;
+
+function PANEL:Paint(width, height)
+	INFOTEXT_SLICED:Draw(0, 0, width, height, 8, Color(255, 255, 255, 150));
+	return true;
 end;
 
 -- Called each frame.
 function PANEL:Think()
-	self.infoLabel:SetPos(self.infoLabel.x, 30 - self.infoLabel:GetTall());
+	self.infoLabel:SetPos(self.infoLabel.x, 34 - self.infoLabel:GetTall());
 end;
 	
 vgui.Register("cwBusinessCustom", PANEL, "DPanel");
@@ -196,11 +197,22 @@ local PANEL = {};
 
 -- Called when the panel is initialized.
 function PANEL:Init()
+	local FACTION = Clockwork.faction:FindByID(Clockwork.Client:GetFaction());
+	local CLASS = Clockwork.class:FindByID(Clockwork.Client:Team());
+	local costScale = CLASS.costScale or FACTION.costScale or 1;
 	local itemData = self:GetParent().itemData;
-		self:SetSize(40, 40);
+		self:SetSize(48, 48);
 		self.itemTable = itemData.itemTable;
 	Clockwork.plugin:Call("PlayerAdjustBusinessItemTable", self.itemTable);
 	
+	if (!self.itemTable.originalCost) then
+		self.itemTable.originalCost = self.itemTable("cost");
+	end;
+
+	if (costScale >= 0) then
+		self.itemTable.cost = self.itemTable.originalCost * costScale;
+	end;
+
 	local model, skin = Clockwork.item:GetIconInfo(self.itemTable);
 	self.spawnIcon = Clockwork.kernel:CreateMarkupToolTip(vgui.Create("cwSpawnIcon", self));
 	
@@ -217,13 +229,23 @@ function PANEL:Init()
 	
 	self.spawnIcon:SetModel(model, skin);
 	self.spawnIcon:SetToolTip("");
-	self.spawnIcon:SetSize(40, 40);
+	self.spawnIcon:SetSize(48, 48);
 end;
 
 -- Called each frame.
 function PANEL:Think()
+	if (!self.nextUpdateMarkup) then
+		self.nextUpdateMarkup = 0;
+	end;
+	
+	if (CurTime() < self.nextUpdateMarkup) then
+		return;
+	end;
+
 	self.spawnIcon:SetMarkupToolTip(Clockwork.item:GetMarkupToolTip(self.itemTable, true));
 	self.spawnIcon:SetColor(self.itemTable("color"));
+	
+	self.nextUpdateMarkup = CurTime() + 1;
 end;
 	
 vgui.Register("cwBusinessItem", PANEL, "DPanel");

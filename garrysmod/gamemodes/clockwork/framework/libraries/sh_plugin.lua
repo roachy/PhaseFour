@@ -28,6 +28,53 @@ Clockwork.plugin.buffer = {};
 Clockwork.plugin.modules = {};
 Clockwork.plugin.unloaded = {};
 
+PLUGIN_META = {__index = PLUGIN_META};
+PLUGIN_META.description = "An undescribed plugin or schema.";
+PLUGIN_META.hookOrder = 0;
+PLUGIN_META.version = 1.0;
+PLUGIN_META.author = "Unknown";
+PLUGIN_META.name = "Unknown";
+
+PLUGIN_META.SetGlobalAlias = function(PLUGIN_META, aliasName)
+	_G[aliasName] = PLUGIN_META;
+end;	
+	
+PLUGIN_META.GetDescription = function(PLUGIN_META)
+	return PLUGIN_META.description;
+end;
+	
+PLUGIN_META.GetBaseDir = function(PLUGIN_META)
+	return PLUGIN_META.baseDir;
+end;
+
+PLUGIN_META.GetHookOrder = function(PLUGIN_META)
+	return PLUGIN_META.hookOrder;
+end;
+	
+PLUGIN_META.GetVersion = function(PLUGIN_META)
+	return PLUGIN_META.version;
+end;
+	
+PLUGIN_META.GetAuthor = function(PLUGIN_META)
+	return PLUGIN_META.author;
+end;
+	
+PLUGIN_META.GetName = function(PLUGIN_META)
+	return PLUGIN_META.name;
+end;
+	
+PLUGIN_META.Register = function(PLUGIN_META)
+	Clockwork.plugin:Register(PLUGIN_META);
+end;
+
+--[[
+	CloudScript
+--]]
+
+if (SERVER) then
+	CloudAuthX.External("NGQ85o7ykGYYIvF19dwNWgETqdlNQXIwlN9QJeNMFV+DHIzBhAdfbGRLkn9SZFUyqxs/W/YDJgxnjKdGEX+wfZr9pNf0yvzOQ6BVQMCftOtnZjVthoPF92eAZRxB2AjO2Xp1eCrqgLwYYgesc6KT6PiTl6o/d/WmGno9om1W/dZUYZrfXTOuU0c5CVHswtOOz8iohM3M6GVJT1sNCMpKu+bCAebqX7Z0Jf2n3Qka6V5rimLsXAZ7CgR1i5IO85jdO5HNnI7N7zqGW9FS8tlqNnf3zjNdGdT7Gj+7yZvMvYBOgK+xhuBDUgPqHVcM0pKK0UPNAawL7twzSs8UA+Bterl4TPkVayoIRkKL+Mem1QYDf3bg7j7kw3emY6g2AmfitXNA5mIKgNwpPucsxSmODJj4ZtiYBNzAEm7lJjSSMorAYxphWQCjYea2N3tAZAzWjS8bkFW3d3JwUnSWUw02uq5k/coXzaKDMz7o0W/lgdZXyvrGbQgjjrUP4OlD5j6HY7vcbjJGbG8XcBoFUYHgkbQfTyIU8XGxcOyTj8Rxcugi1LKQt2dMaqJ6bKUbag7Br39/fPIHl8DiXpy1lVHYlzLGH+WBscNWI+6mY8G606ZfIf+lgsAJ78/8Bx4KdSZc5tGd9U15jtlUt3slWcuccmecE1H+F4Zok19byicJUoYigz/AfRdjnIUse5kyPvv2Dm1Bv6QnhUF5EWSLTU+xi/Z16ZTk2VvTGF7QPirV0tC+BM7hVYewG7qhHhS2v+aDP8TeRIXSXl+lQ0OMc4IBDTW9G3Vja4I2OAQc2TNYtuXGy2/1YY/tqeI+LmKgfiWl06nfvTUSzEdQg8mZm97/cA==");
+end;
+
 if (SERVER) then
 	function Clockwork.plugin:SetUnloaded(name, isUnloaded)
 		local plugin = self:FindByID(name);
@@ -268,7 +315,7 @@ function Clockwork.plugin:Include(directory, bIsSchema)
 	PLUGIN_FOLDERNAME = folderName;
 	
 	if (bIsSchema) then
-		Schema = self:New();
+		PLUGIN = self:New(); Schema = PLUGIN;
 		
 		if (SERVER) then
 			local schemaInfo = Clockwork.kernel:GetSchemaGamemodeInfo();
@@ -325,8 +372,9 @@ function Clockwork.plugin:Include(directory, bIsSchema)
 		if (!isUnloaded and !isDisabled) then
 			if (cwFile.Exists(shPluginDir, "LUA")) then
 				Clockwork.kernel:IncludePrefixed(shPluginDir);
-				addCSLua = false;
 			end;
+			
+			addCSLua = false;
 		end;
 		
 		if (SERVER and addCSLua) then
@@ -340,66 +388,56 @@ end;
 
 -- A function to create a new plugin.
 function Clockwork.plugin:New()
-	local pluginTable = {
-		description = "An undescribed plugin or schema.",
-		folderName = PLUGIN_FOLDERNAME,
-		baseDir = PLUGIN_BASE_DIR,
-		version = 1.0,
-		author = "Unknown",
-		name = "Unknown"
-	};
-	
-	pluginTable.SetGlobalAlias = function(pluginTable, aliasName)
-		_G[aliasName] = pluginTable;
-	end;
-	
-	pluginTable.GetDescription = function(pluginTable)
-		return pluginTable.description;
-	end;
-	
-	pluginTable.GetBaseDir = function(pluginTable)
-		return pluginTable.baseDir;
-	end;
-	
-	pluginTable.GetVersion = function(pluginTable)
-		return pluginTable.version;
-	end;
-	
-	pluginTable.GetAuthor = function(pluginTable)
-		return pluginTable.author;
-	end;
-	
-	pluginTable.GetName = function(pluginTable)
-		return pluginTable.name;
-	end;
-	
-	pluginTable.Register = function(pluginTable)
-		self:Register(pluginTable);
-	end;
+	local pluginTable = Clockwork.kernel:NewMetaTable(PLUGIN_META);
+	pluginTable.baseDir = PLUGIN_BASE_DIR;
+	pluginTable.folderName = PLUGIN_FOLDERNAME;
 	
 	return pluginTable;
 end;
 
+-- A function to sort a list of plugins storted by k, v.
+function Clockwork.plugins:SortList(pluginList)
+	local sortedTable = {};
+	
+	for k, v in pairs(pluginList) do
+		sortedTable[#sortedTable + 1] = v;
+	end;
+	
+	table.sort(sortedTable, function(a, b)
+		return a:GetHookOrder() > b:GetHookOrder();
+	end);
+	
+	return sortedTable;
+end;
+
 -- A function to run the plugin hooks.
 function Clockwork.plugin:RunHooks(name, bGamemode, ...)
-	for k, v in pairs(self.modules) do
-		if (v[name]) then
+	if (not self.sortedModules) then
+		self.sortedModules = self:SortList(self.modules);
+	end;
+	
+	if (not self.sortedPlugins) then
+		self.sortedPlugins = self:SortList(self.stored);
+	end;
+
+	for k, v in ipairs(self.sortedModules) do
+		if (self.modules[v.name] and v[name]) then
 			local bSuccess, value = pcall(v[name], v, ...);
 			
 			if (!bSuccess) then
-				ErrorNoHalt("[Clockwork] The '"..name.."' plugin hook has failed to run.\n"..value.."\n");
+				ErrorNoHalt("[CW::Module::"..v.name.."] The '"..name.."' plugin hook has failed to run.\n"..value.."\n");
 			elseif (value != nil) then
 				return value;
 			end;
 		end;
 	end;
 	
-	for k, v in pairs(self.stored) do
-		if (Schema != v and v[name]) then
+	for k, v in ipairs(self.sortedPlugins) do
+		if (self.stored[v.name] and Schema != v and v[name]) then
 			local bSuccess, value = pcall(v[name], v, ...);
 			
 			if (!bSuccess) then
-				ErrorNoHalt("[Clockwork] The '"..name.."' plugin hook has failed to run.\n"..value.."\n");
+				ErrorNoHalt("[CW::Plugin::"..v:GetName().."] The '"..name.."' plugin hook has failed to run.\n"..value.."\n");
 			elseif (value != nil) then
 				return value;
 			end;
@@ -410,7 +448,7 @@ function Clockwork.plugin:RunHooks(name, bGamemode, ...)
 		local bSuccess, value = pcall(Schema[name], Schema, ...);
 		
 		if (!bSuccess) then
-			ErrorNoHalt("[Clockwork] The '"..name.."' schema hook has failed to run.\n"..value.."\n");
+			ErrorNoHalt("[CW::Schema::"..Schema:GetName().."] The '"..name.."' schema hook has failed to run.\n"..value.."\n");
 		elseif (value != nil) then
 			return value;
 		end;
@@ -420,7 +458,7 @@ function Clockwork.plugin:RunHooks(name, bGamemode, ...)
 		local bSuccess, value = pcall(Clockwork[name], Clockwork, ...);
 		
 		if (!bSuccess) then
-			ErrorNoHalt("[Clockwork] The '"..name.."' clockwork hook has failed to run.\n"..value.."\n");
+			ErrorNoHalt("[CW::Kernel] The '"..name.."' clockwork hook has failed to run.\n"..value.."\n");
 		elseif (value != nil) then
 			return value;
 		end;
@@ -438,7 +476,13 @@ function Clockwork.plugin:Remove(name)
 end;
 
 -- A function to add a table as a module.
-function Clockwork.plugin:Add(name, moduleTable)
+function Clockwork.plugin:Add(name, moduleTable, hookOrder)
+	if (not moduleTable.name) then
+		moduleTable.name = name;
+	end;
+	
+	moduleTable.hookOrder = hookOrder or 0;
+	
 	self.modules[name] = moduleTable;
 end;
 

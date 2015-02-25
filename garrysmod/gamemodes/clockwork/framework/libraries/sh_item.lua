@@ -1,5 +1,5 @@
 --[[
-	© 2014 CloudSixteen.com do not share, re-distribute or modify
+	Â© 2014 CloudSixteen.com do not share, re-distribute or modify
 	without permission of its author (kurozael@gmail.com).
 
 	Clockwork was created by Conna Wiles (also known as kurozael.)
@@ -69,6 +69,14 @@ function CLASS_TABLE:__call(varName, failSafe)
 				return returnValue;
 			end;
 		end;
+	end;
+	
+	--[[
+		Check data first. We may be overriding this value
+		or simply want to return it instead.
+	--]]
+	if (self.data[varName] != nil) then
+		return self.data[varName];
 	end;
 	
 	return (self[varName] != nil and self[varName] or failSafe);
@@ -173,6 +181,27 @@ function CLASS_TABLE:GetData(dataName)
 	return self.data[dataName];
 end;
 
+-- A function to add a new recipe for this item.
+function CLASS_TABLE:AddRecipe(...)
+	local arguments = {...};
+	local currentItem = nil;
+	local recipeTable = {ingredients = {}};
+	
+	for k, v in pairs(arguments) do
+		if (type(v) == "string") then
+			currentItem = v;
+		elseif (type(v) == "number") then
+			if (currentItem) then
+				recipeTable.ingredients[currentItem] = v;
+			end;
+		end;
+	end;
+	
+	self.recipes[#self.recipes + 1] = recipeTable;
+	
+	return recipeTable;
+end;
+
 -- A function to get whether two items are the same.
 function CLASS_TABLE:IsTheSameAs(itemTable)
 	if (itemTable) then
@@ -186,7 +215,78 @@ end;
 -- A function to get whether data is networked.
 function CLASS_TABLE:IsDataNetworked(key)
 	return (self.networkData[key] == true);
+end;
+
+if (SERVER) then
+	-- A function to deduct neccessary funds from a plater after ordering.
+	function CLASS_TABLE:DeductFunds(player)
+		if (#self.recipes > 0) then
+			for k, v in pairs(self.recipes) do
+				if (Clockwork.kernel:HasObjectAccess(player, v)) then
+					local hasIngredients = true;
+					
+					for k2, v2 in pairs(v.ingredients) do
+						if (table.Count(player:GetItemsByID(k2)) < v2) then
+							hasIngredients = false;
+						end;
+					end;
+					
+					if (hasIngredients) then
+						for k2, v2 in pairs(v.ingredients) do
+							for i = 1, v2 do
+								player:TakeItemByID(k2);
+							end;
+						end;
+						
+						break;
+					end;
+				end;
+			end;
+		end;
+		
+		if (self("cost") == 0) then
+			return;
+		end;
+		
+		if (self("batch") > 1) then
+			Clockwork.player:GiveCash(player, -(self("cost") * self("batch")), self("batch").." "..Clockwork.kernel:Pluralize(self("name")));
+			Clockwork.kernel:PrintLog(LOGTYPE_MINOR, player:Name().." has ordered "..self("batch").." "..Clockwork.kernel:Pluralize(self("name"))..".");
+		else
+			Clockwork.player:GiveCash(player, -(self("cost") * self("batch")), self("batch").." "..self("name"));
+			Clockwork.kernel:PrintLog(LOGTYPE_MINOR, player:Name().." has ordered "..self("batch").." "..self("name")..".");
+		end;
+	end;
 	
+	-- A function to get whether a player can afford to order the item.
+	function CLASS_TABLE:CanPlayerAfford(player)
+		if (not Clockwork.player:CanAfford(player, self("cost") * self("batch"))) then
+			return false;
+		end;
+		
+		if (#self.recipes > 0) then
+			for k, v in pairs(self.recipes) do
+				if (Clockwork.kernel:HasObjectAccess(player, v)) then
+					local hasIngredients = true;
+					
+					for k2, v2 in pairs(v.ingredients) do
+						local itemList = player:GetItemsByID(k2);
+						
+						if (not itemList or table.Count(itemList) < v2) then
+							hasIngredients = false;
+						end;
+					end;
+					
+					if (hasIngredients) then
+						return true;
+					end;
+				end;
+			end;
+			
+			return false;
+		end;
+		
+		return true;
+	end;
 end;
 
 -- A function to register a new item.
@@ -249,6 +349,7 @@ function Clockwork.item:New(baseItem, bIsBaseItem)
 		object.networkQueue = {};
 		object.networkData = {};
 		object.defaultData = {};
+		object.recipes = {};
 		object.queryProxies = {};
 		object.isBaseItem = bIsBaseItem;
 		object.baseItem = baseItem;
@@ -679,17 +780,6 @@ else
 		elseif (itemTable("space") == 0) then
 			space = "Takes no space";
 		end;
-
-		if (bBusinessStyle) then
-			local totalCost = itemTable("cost") * itemTable("batch");
-			
-			if (Clockwork.config:Get("cash_enabled"):Get()
-			and totalCost != 0) then
-				weight = Clockwork.kernel:FormatCash(totalCost);
-			else
-				weight = "Free";
-			end;
-		end;
 		
 		if (itemTable.GetClientSideName
 		and itemTable:GetClientSideName()) then
@@ -748,6 +838,63 @@ else
 			markupObject:Add(displayInfo.toolTip);
 		else
 			markupObject:Add(description);
+		end;
+		
+		if (bBusinessStyle) then
+			local redColor = Color(255, 50, 50, 255);
+			local greenColor = Color(50, 255, 50, 255);
+			
+			if (#itemTable.recipes > 0) then
+				local numRecipe = 1;
+				
+				for k, v in ipairs(itemTable.recipes) do
+					if (Clockwork.kernel:HasObjectAccess(Clockwork.Client, v)) then
+						markupObject:Title("Recipe "..numRecipe);
+							
+						for k2, v2 in pairs(v.ingredients) do
+							local colorToUse = redColor;
+							local requiredItem = Clockwork.item:FindByID(k2);
+							
+							if (requiredItem) then
+								local numItems = Clockwork.inventory:GetItemsByID(
+									Clockwork.inventory:GetClient(), k2
+								);
+								
+								if (numItems and table.Count(numItems) >= v2) then
+									colorToUse = greenColor;
+								end;
+								
+								local itemName = requiredItem("name");
+								
+								if (v2 > 1) then
+									itemName = Clockwork.kernel:Pluralize(itemName);
+								end;
+								
+								local nameString = v2.."x "..itemName;
+								
+								markupObject:Add(nameString, colorToUse, 0.95);
+							end;
+						end;
+						
+						numRecipe = numRecipe + 1;
+					end;
+				end;
+			end;
+			
+			local totalCost = itemTable("cost") * itemTable("batch");
+			
+			if (Clockwork.config:Get("cash_enabled"):Get()
+			and totalCost != 0) then
+				local costString = Clockwork.kernel:FormatCash(totalCost);
+				local colorToUse = redColor;
+				
+				if (Clockwork.player:GetCash() >= totalCost) then
+					colorToUse = greenColor;
+				end;
+				
+				markupObject:Title("Price");
+				markupObject:Add(costString, colorToUse, 1);
+			end;
 		end;
 		
 		markupObject:Title("Category");

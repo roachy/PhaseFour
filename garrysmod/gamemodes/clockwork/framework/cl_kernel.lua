@@ -55,8 +55,8 @@ DeriveGamemode("sandbox");
 	on default GMod hooks that are called.
 --]]
 
-hook.ClockworkCall = hook.Call;
-hook.Timings = {};
+hook.ClockworkCall = hook.ClockworkCall or hook.Call;
+hook.Timings = hook.Timings or {};
 
 function hook.Call(name, gamemode, ...)
 	if (!IsValid(Clockwork.Client)) then
@@ -251,8 +251,6 @@ Clockwork.datastream:Hook("RecogniseMenu", function(data)
 			(ScrW() / 2) - (menuPanel:GetWide() / 2), (ScrH() / 2) - (menuPanel:GetTall() / 2)
 		);
 	end;
-	
-	print(Clockwork.Client:GetCharacterData("Test"));
 	
 	Clockwork.kernel:SetRecogniseMenu(menuPanel);
 end);
@@ -553,7 +551,10 @@ function Clockwork:ClockworkConfigInitialized(key, value)
 end;
 
 -- Called when a Clockwork ConVar has changed.
-function Clockwork:ClockworkConVarChanged(name, previousValue, newValue) end;
+function Clockwork:ClockworkConVarChanged(name, previousValue, newValue)
+	Clockwork.option:SetColor("information", Color(GetConVarNumber("cwTextColorR"), 
+		GetConVarNumber("cwTextColorG"), GetConVarNumber("cwTextColorB"), GetConVarNumber("cwTextColorA")));
+end;
 
 -- Called when Clockwork config has changed.
 function Clockwork:ClockworkConfigChanged(key, data, previousValue, newValue) end;
@@ -682,6 +683,28 @@ function Clockwork:Initialize()
 	CW_CONVAR_SHOWLOG = self.kernel:CreateClientConVar("cwShowLog", 1, true, true);
 	CW_CONVAR_SHOWOOC = self.kernel:CreateClientConVar("cwShowOOC", 1, true, true);
 	CW_CONVAR_SHOWIC = self.kernel:CreateClientConVar("cwShowIC", 1, true, true);
+	CW_CONVAR_ESPTIME = self.kernel:CreateClientConVar("cwESPTime", 1, true, true);
+	
+	CW_CONVAR_TEXTCOLORR = self.kernel:CreateClientConVar("cwTextColorR", 255, true, true);
+	CW_CONVAR_TEXTCOLORG = self.kernel:CreateClientConVar("cwTextColorG", 200, true, true);
+	CW_CONVAR_TEXTCOLORB = self.kernel:CreateClientConVar("cwTextColorB", 0, true, true);
+	CW_CONVAR_TEXTCOLORA = self.kernel:CreateClientConVar("cwTextColorA", 255, true, true);
+	CW_CONVAR_BACKCOLORR = self.kernel:CreateClientConVar("cwBackColorR", 40, true, true);
+	CW_CONVAR_BACKCOLORG = self.kernel:CreateClientConVar("cwBackColorG", 40, true, true);
+	CW_CONVAR_BACKCOLORB = self.kernel:CreateClientConVar("cwBackColorB", 40, true, true);
+	CW_CONVAR_BACKCOLORA = self.kernel:CreateClientConVar("cwBackColorA", 255, true, true);
+	CW_CONVAR_TABX = self.kernel:CreateClientConVar("cwTabPosX", 56, true, true);
+	CW_CONVAR_TABY = self.kernel:CreateClientConVar("cwTabPosY", 112, true, true);
+	CW_CONVAR_FADEPANEL = self.kernel:CreateClientConVar("cwFadePanels", 1, true, true);
+	CW_CONVAR_CHARSTRING = self.kernel:CreateClientConVar("cwCharString", "CHARACTERS", true, true);
+	CW_CONVAR_CLOSESTRING = self.kernel:CreateClientConVar("cwCloseString", "CLOSE MENU", true, true);
+	CW_CONVAR_MATERIAL = self.kernel:CreateClientConVar("cwMaterial", "hunter/myplastic", true, true);
+	CW_CONVAR_BACKX = self.kernel:CreateClientConVar("cwBackX", 61, true, true);
+	CW_CONVAR_BACKY = self.kernel:CreateClientConVar("cwBackY", 109, true, true);
+	CW_CONVAR_BACKW = self.kernel:CreateClientConVar("cwBackW", 321, true, true);
+	CW_CONVAR_BACKH = self.kernel:CreateClientConVar("cwBackH", 109, true, true);
+	CW_CONVAR_SHOWMATERIAL = self.kernel:CreateClientConVar("cwShowMaterial", 0, true, true);
+	CW_CONVAR_SHOWGRADIENT = self.kernel:CreateClientConVar("cwShowGradient", 1, true, true);
 	
 	if (!self.chatBox.panel) then
 		self.chatBox:CreateDermaAll();
@@ -717,15 +740,15 @@ function Clockwork:ClockworkInitialized()
 		newLogoFile = oldLogoFile;
 	end;
 	
-	self.SpawnIconMaterial = Material("vgui/spawnmenu/hover");
+	self.SpawnIconMaterial = Clockwork.kernel:GetMaterial("vgui/spawnmenu/hover");
 	self.DefaultGradient = surface.GetTextureID("gui/gradient_down");
-	self.GradientTexture = Material(self.option:GetKey("gradient")..".png");
-	self.ClockworkSplash = Material(newLogoFile);
-	self.FishEyeTexture = Material("models/props_c17/fisheyelens");
+	self.GradientTexture = Clockwork.kernel:GetMaterial(self.option:GetKey("gradient")..".png");
+	self.ClockworkSplash = Clockwork.kernel:GetMaterial(newLogoFile);
+	self.FishEyeTexture = Clockwork.kernel:GetMaterial("models/props_c17/fisheyelens");
 	self.GradientCenter = surface.GetTextureID("gui/center_gradient");
 	self.GradientRight = surface.GetTextureID("gui/gradient");
 	self.GradientUp = surface.GetTextureID("gui/gradient_up");
-	self.ScreenBlur = Material("pp/blurscreen");
+	self.ScreenBlur = Clockwork.kernel:GetMaterial("pp/blurscreen");
 	self.Gradients = {
 		[GRADIENT_CENTER] = self.GradientCenter;
 		[GRADIENT_RIGHT] = self.GradientRight;
@@ -1171,17 +1194,22 @@ function Clockwork:MenuItemsAdd(menuItems)
 	local scoreboardName = self.option:GetKey("name_scoreboard");
 	local directoryName = self.option:GetKey("name_directory");
 	local inventoryName = self.option:GetKey("name_inventory");
-	local businessName = self.option:GetKey("name_business");
 	
 	menuItems:Add("Classes", "cwClasses", "Choose from a list of available classes.");
 	menuItems:Add("Settings", "cwSettings", "Configure the way Clockwork works for you.");
 	menuItems:Add("Donations", "cwDonations", "Check your donation subscriptions.");
 	menuItems:Add(systemName, "cwSystem", self.option:GetKey("description_system"));
 	menuItems:Add(scoreboardName, "cwScoreboard", self.option:GetKey("name_scoreboard"));
-	menuItems:Add(businessName, "cwBusiness", self.option:GetKey("description_business"));
 	menuItems:Add(inventoryName, "cwInventory", self.option:GetKey("description_inventory"));
 	menuItems:Add(directoryName, "cwDirectory", self.option:GetKey("description_directory"));
 	menuItems:Add(attributesName, "cwAttributes", self.option:GetKey("description_attributes"));
+	
+	print(self.config:Get("show_business"):GetBoolean());
+	
+	if (self.config:Get("show_business"):GetBoolean() == true) then
+		local businessName = self.option:GetKey("name_business");
+		menuItems:Add(businessName, "cwBusiness", self.option:GetKey("description_business"));
+	end;
 end;
 
 -- Called when the menu's items should be destroyed.
@@ -1404,8 +1432,8 @@ function Clockwork:HUDPaintImportant() end;
 -- Called when the top screen HUD should be painted.
 function Clockwork:HUDPaintTopScreen(info) end;
 
-local SCREEN_DAMAGE_OVERLAY = Material("clockwork/screendamage.png");
-local VIGNETTE_OVERLAY = Material("clockwork/vignette.png");
+local SCREEN_DAMAGE_OVERLAY = Clockwork.kernel:GetMaterial("clockwork/screendamage.png");
+local VIGNETTE_OVERLAY = Clockwork.kernel:GetMaterial("clockwork/vignette.png");
 
 -- Called when the local player's screen damage should be drawn.
 function Clockwork:DrawPlayerScreenDamage(damageFraction)
@@ -1478,9 +1506,7 @@ function Clockwork:HUDPaintForeground()
 		local x = ScrW() * 0.25;
 		local y = ScrH() * 0.3;
 		
-		self.kernel:DrawGradient(
-			GRADIENT_RIGHT, x - 16, y - 16, width + 32, height + 32, Color(100, 100, 100, 200)
-		);
+		SLICED_PROGRESS_BAR:Draw(x - 16, y - 16, width + 32, height + 32, 8);
 		
 		self.kernel:DrawBar(
 			x, y, width, height, info.color or Clockwork.option:GetColor("information"),
@@ -1495,9 +1521,7 @@ function Clockwork:HUDPaintForeground()
 			local x = ScrW() * 0.25;
 			local y = ScrH() * 0.3;
 			
-			self.kernel:DrawGradient(
-				GRADIENT_RIGHT, x - 16, y - 16, width + 32, height + 32, Color(100, 100, 100, 200)
-			);
+			SLICED_PROGRESS_BAR:Draw(x - 16, y - 16, width + 32, height + 32, 8);
 			
 			self.kernel:DrawBar(
 				x, y, width, height, info.color or Clockwork.option:GetColor("information"),
@@ -1917,46 +1941,149 @@ function Clockwork:GetModelSelectWeaponModel(model) end;
 -- Called when a model selection's sequence is needed.
 function Clockwork:GetModelSelectSequence(entity, model) end;
 
--- Called when the admin ESP info is needed.
+--[[
+    @codebase Client
+    @details Finds the location of the player and packs together the info for observer ESP.
+    @class Clockwork
+    @param Table The current table of ESP positions/colors/names to add on to.
+--]]
 function Clockwork:GetAdminESPInfo(info)
 	for k, v in pairs(cwPlayer.GetAll()) do
-		if (v:HasInitialized()) then
+		if (v:HasInitialized()) then			
 			local physBone = v:LookupBone("ValveBiped.Bip01_Head1");
-			
+			local position = nil;	
+			local topText = {v:Name()}
+					
 			if (physBone) then
 				local bonePosition = v:GetBonePosition(physBone);
-				local position = nil;
-					
-				if (string.find(v:GetModel(), "vortigaunt")) then
-					bonePosition = v:GetBonePosition(v:LookupBone("ValveBiped.Head"));
-				end;
-					
+						
 				if (bonePosition) then
 					position = bonePosition + Vector(0, 0, 16);
-				else
-					position = v:GetPos() + Vector(0, 0, 80);
 				end;
-				
-				info[#info + 1] = {
-					position = position,
-					color = cwTeam.GetColor(v:Team()),
-					text = v:Name().." ("..v:Health().."/"..v:GetMaxHealth()..")"
-				};
+			else
+				position = v:GetPos() + Vector(0, 0, 80);
+			end;
+					
+			Clockwork.plugin:Call("GetStatusInfo", v, topText)			
+					
+			info[#info + 1] = {
+				position = position,
+				text = {
+					{table.concat(topText, " "), cwTeam.GetColor(v:Team())}				
+				}
+			};
+			
+			if (self.Client != v) then	
+				Clockwork.plugin:Call("GetPlayerESPInfo", v, info[#info]["text"]);	
 			end;
 		end;
 	end;
 end;
 
--- Called when the post progress bar info is needed.
+-- Called when a player's status info is needed.
+function Clockwork:GetStatusInfo(player, text)
+	local action = self.player:GetAction(player, true);
+	
+	if (action) then
+		if (!player:IsRagdolled()) then
+			if (action == "lock") then
+				table.insert(text, "[Locking]");
+			elseif (action == "unlock") then
+				table.insert(text, "[Unlocking]");
+			end;
+		elseif (action == "unragdoll") then
+			if (player:GetRagdollState() == RAGDOLL_FALLENOVER) then
+				table.insert(text, "[Getting Up]");
+			else
+				table.insert(text, "[Unconscious]");
+			end;
+		elseif (!player:Alive()) then
+			table.insert(text, "[Dead]");
+		else
+			table.insert(text, "[Performing '"..action.."']");
+		end;
+	end;
+	
+	if (player:GetRagdollState() == RAGDOLL_FALLENOVER) then
+		local fallenOver = player:GetSharedVar("FallenOver");
+				
+		if (fallenOver) then
+			table.insert(text, "[Fallen Over]");			
+		end;
+	end;
+end;
+
+-- Called when extra player info is needed.
+function Clockwork:GetPlayerESPInfo(player, text)
+	if (player:IsValid()) then
+		local weapon = player:GetActiveWeapon();
+		local health = player:Health();
+		local color;
+		if (player:Alive()) then			
+			table.insert(text, {"Health: ["..health.."]", self:GetValueColor(health)})
+			
+			if (player:Armor() > 0) then
+				table.insert(text, {"Armor: ["..player:Armor().."]", self:GetValueColor(player:Armor())});
+			end;
+		
+			if (weapon) then			
+				local raised = self.player:GetWeaponRaised(player);
+				
+				if (raised == true) then
+					color = Color(255, 0, 0, 255);
+				else
+					color = Color(255, 255, 255, 255);
+				end;
+				
+				local printName = weapon:GetPrintName();
+				if (printName) then
+					table.insert(text, {printName, color})
+				end;
+			end;
+		end;
+	end;
+end;
+
+-- A function to get the color of a value from green to red.
+function Clockwork:GetValueColor(value)
+	local red = math.floor(255 - (value * 2.55));
+	local green = math.floor(value * 2.55);
+	
+	return Color(red, green, 0, 255);
+end;
+
+--[[
+    @codebase Client
+    @details This function is called after the progress bar info updates.
+    @class Clockwork
+--]]
 function Clockwork:GetPostProgressBarInfo() end;
 
--- Called when the custom character options are needed.
+--[[
+    @codebase Client
+    @details This function is called when custom character options are needed.
+    @class Clockwork
+    @param Table The character whose options are needed.
+    @param Table The currently available options.
+    @param Table The menu itself.
+--]]
 function Clockwork:GetCustomCharacterOptions(character, options, menu) end;
 
--- Called when the custom character buttons are needed.
+--[[
+    @codebase Client
+    @details This function is called when custom character buttons are needed.
+    @class Clockwork
+    @param Table The character whose buttons are needed.
+    @param Table The currently available buttons.
+--]]
 function Clockwork:GetCustomCharacterButtons(character, buttons) end;
 
--- Called when the progress bar info is needed.
+--[[
+    @codebase Client
+    @details This function is called to figure out the text, percentage and flash of the current progress bar.
+    @class Clockwork
+    @returns Table The text, flash, and percentage of the progress bar.
+--]]
 function Clockwork:GetProgressBarInfo()
 	local action, percentage = self.player:GetAction(self.Client, true);
 	
@@ -1994,7 +2121,12 @@ function Clockwork:PostDrawPlayerInfo(boxInfo, information, subInformation) end;
 -- Called just after the date time box is drawn.
 function Clockwork:PostDrawDateTimeBox(info) end;
 
--- Called when the player info text is needed.
+--[[
+    @codebase Client
+    @details This function is called when local player info text is needed and adds onto it (F1 menu).
+    @class Clockwork
+    @param Table The current table of player info text to add onto.
+--]]
 function Clockwork:GetPlayerInfoText(playerInfoText)
 	local cash = self.player:GetCash();
 	local wages = self.player:GetWages();
@@ -2013,7 +2145,13 @@ function Clockwork:GetPlayerInfoText(playerInfoText)
 	playerInfoText:AddSub("CLASS", cwTeam.GetName(self.Client:Team()), 1);
 end;
 
--- Called when the target player's fade distance is needed.
+--[[
+    @codebase Client
+    @details This function is called when the player's fade distance is needed for their target text (when you look at them).
+    @class Clockwork
+    @param Table The player we are finding the distance for.
+    @returns Int The fade distance, defaulted at 4096.
+--]]
 function Clockwork:GetTargetPlayerFadeDistance(player)
 	return 4096;
 end;
@@ -2021,7 +2159,13 @@ end;
 -- Called when the player info text should be destroyed.
 function Clockwork:DestroyPlayerInfoText(playerInfoText) end;
 
--- Called when the target player's text is needed.
+--[[
+    @codebase Client
+    @details This function is called when the targeted player's target text is needed.
+    @class Clockwork
+    @param Table The player we are finding the distance for.
+    @param Table The player's current target text.
+--]]
 function Clockwork:GetTargetPlayerText(player, targetPlayerText)
 	local targetIDTextFont = self.option:GetFont("target_id_text");
 	local physDescTable = {};
@@ -2652,13 +2796,13 @@ function Clockwork:HUDDrawScoreBoard()
 		local material = self.ClockworkIntroOverrideImage or self.ClockworkSplash;
 		local sineWave = math.sin(curTime);
 		local height = 256;
-		local width = 512;
-		local alpha = 255;
+		local width = 768;
+		local alpha = 384;
 		
 		if (!self.ClockworkIntroOverrideImage) then
 			if (introImage != "" and timeLeft <= 8) then
 				self.ClockworkIntroWhiteScreen = curTime + (FrameTime() * 8);
-				self.ClockworkIntroOverrideImage = Material(introImage..".png");
+				self.ClockworkIntroOverrideImage = Clockwork.kernel:GetMaterial(introImage..".png");
 				surface.PlaySound("buttons/combine_button5.wav");
 			end;
 		end;
@@ -2701,16 +2845,10 @@ function Clockwork:HUDDrawScoreBoard()
 		self.kernel:DrawSimpleGradientBox(0, 0, 0, scrW, scrH, Color(0, 0, 0, 255));
 		draw.SimpleText(self.kernel:GetSharedVar("NoMySQL"), introTextSmallFont, scrW / 2, scrH / 2, Color(179, 46, 49, 255), 1, 1);
 	elseif (self.DataStreamedAlpha and self.DataStreamedAlpha > 0) then
-		local textString = "Please wait while Clockwork initializes.";
-		
-		if (!self.CreatedLocalPlayer) then
-			textString = "Please wait while Source creates the local player.";
-		elseif (!self.config:HasInitialized()) then
-			textString = "Please wait while the server config is retrieved.";
-		end;
+		local textString = "LOADING...";
 		
 		self.kernel:DrawSimpleGradientBox(0, 0, 0, scrW, scrH, Color(0, 0, 0, self.DataStreamedAlpha));
-		draw.SimpleText(textString, introTextSmallFont, scrW / 2, scrH / 2, Color(colorWhite.r, colorWhite.g, colorWhite.b, self.DataStreamedAlpha), 1, 1);
+		draw.SimpleText(textString, introTextSmallFont, scrW / 2, scrH * 0.75, Color(colorWhite.r, colorWhite.g, colorWhite.b, self.DataStreamedAlpha), 1, 1);
 		
 		drawPendingScreenBlack = nil;
 	end;
@@ -2759,7 +2897,7 @@ function Clockwork:PostDrawBackgroundBlurs()
 		if (factionTable and factionTable.material) then
 			if (file.Exists("materials/"..factionTable.material..".png", "GAME")) then
 				if (!panelInfo[3]) then
-					panelInfo[3] = Material(factionTable.material..".png");
+					panelInfo[3] = Clockwork.kernel:GetMaterial(factionTable.material..".png");
 				end;
 				
 				if (self.kernel:IsCharacterScreenOpen(true)) then
@@ -2886,18 +3024,14 @@ end;
 
 -- Called when the local player's crosshair should be drawn.
 function Clockwork:DrawPlayerCrosshair(x, y, color)
-	if (self.config:Get("use_free_aiming"):Get()) then
-		surface.SetDrawColor(color.r, color.g, color.b, color.a);
-		surface.DrawRect(x, y, 2, 2);
-		surface.DrawRect(x, y + 9, 2, 2);
-		surface.DrawRect(x, y - 9, 2, 2);
-		surface.DrawRect(x + 9, y, 2, 2);
-		surface.DrawRect(x - 9, y, 2, 2);
-		
-		return true;
-	else
-		return false;
-	end;
+	surface.SetDrawColor(color.r, color.g, color.b, color.a);
+	surface.DrawRect(x, y, 2, 2);
+	surface.DrawRect(x, y + 9, 2, 2);
+	surface.DrawRect(x, y - 9, 2, 2);
+	surface.DrawRect(x + 9, y, 2, 2);
+	surface.DrawRect(x - 9, y, 2, 2);
+
+	return true;
 end;
 
 -- Called when a player starts using voice.
@@ -2984,13 +3118,22 @@ end;
 -- Overriding Garry's "grab ear" animation.
 function Clockwork:GrabEarAnimation(player) end;
 
+concommand.Add("cwLua", function(player, command, arguments)
+	if (player:IsSuperAdmin()) then
+		RunString(table.concat(arguments, " "));
+		return;
+	end;
+	
+	print("You do not have access to this command, "..player:Name()..".");
+end);
+
 local entityMeta = FindMetaTable("Entity");
 local weaponMeta = FindMetaTable("Weapon");
 local playerMeta = FindMetaTable("Player");
 
-entityMeta.ClockworkFireBullets = entityMeta.FireBullets;
-weaponMeta.OldGetPrintName = weaponMeta.GetPrintName;
-playerMeta.SteamName = playerMeta.Name;
+entityMeta.ClockworkFireBullets = entityMeta.ClockworkFireBullets or entityMeta.FireBullets;
+weaponMeta.OldGetPrintName = weaponMeta.OldGetPrintName or weaponMeta.GetPrintName;
+playerMeta.SteamName = playerMeta.SteamName or playerMeta.Name;
 
 -- A function to make a player fire bullets.
 function entityMeta:FireBullets(bulletInfo)
@@ -3176,12 +3319,3 @@ end;
 
 playerMeta.GetName = playerMeta.Name;
 playerMeta.Nick = playerMeta.Name;
-
-concommand.Add("cwLua", function(player, command, arguments)
-	if (player:IsSuperAdmin()) then
-		RunString(table.concat(arguments, " "));
-		return;
-	end;
-	
-	print("You do not have access to this command, "..player:Name()..".");
-end);

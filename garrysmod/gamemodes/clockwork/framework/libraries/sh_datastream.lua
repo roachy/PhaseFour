@@ -6,6 +6,29 @@
 	http://cloudsixteen.com/license/clockwork.html
 --]]
 
+--[[
+The MIT License (MIT)
+
+Copyright (c) 2013 Alex Grist-Hucker
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+--]]
+
 local Clockwork = Clockwork;
 local net = net;
 local ErrorNoHalt = ErrorNoHalt;
@@ -22,7 +45,6 @@ Clockwork.datastream.stored = Clockwork.datastream.stored or {};
 	@details A function to hook a data stream.
 	@param String A unique identifier.
 	@param Function The datastream callback.
-	@returns Bool Whether or not the tables are equal.
 --]]
 function Clockwork.datastream:Hook(name, Callback)
 	self.stored[name] = Callback;
@@ -59,7 +81,7 @@ if (SERVER) then
 		if (data == nil) then data = 0; end;
 		
 		local dataTable = {data = data};
-		local encodedData = pon.encode(dataTable);
+		local encodedData = Clockwork.kernel:Serialize(dataTable);
 			
 		if (encodedData and #encodedData > 0 and bShouldSend) then
 			net.Start("cwDataDS");
@@ -83,7 +105,7 @@ if (SERVER) then
 				player.cwDataStreamData = CW_DS_DATA;
 				
 				if (Clockwork.datastream.stored[player.cwDataStreamName]) then
-					local bSuccess, value = pcall(pon.decode, player.cwDataStreamData);
+					local bSuccess, value = pcall(Clockwork.kernel.Deserialize, Clockwork.kernel, player.cwDataStreamData);
 					
 					if (bSuccess) then
 						Clockwork.datastream.stored[player.cwDataStreamName](player, value.data);
@@ -105,7 +127,7 @@ else
 		if (data == nil) then data = 0; end;
 		
 		local dataTable = {data = data};
-		local encodedData = pon.encode(dataTable);
+		local encodedData = Clockwork.kernel:Serialize(dataTable);
 		
 		if (encodedData and #encodedData > 0) then
 			net.Start("cwDataDS");
@@ -123,7 +145,7 @@ else
 
 		if (CW_DS_NAME and CW_DS_DATA and CW_DS_LENGTH) then			
 			if (Clockwork.datastream.stored[CW_DS_NAME]) then
-				local bSuccess, value = pcall(pon.decode, CW_DS_DATA);
+				local bSuccess, value = pcall(Clockwork.kernel.Deserialize, Clockwork.kernel, CW_DS_DATA);
 			
 				if (bSuccess) then
 					Clockwork.datastream.stored[CW_DS_NAME](value.data);

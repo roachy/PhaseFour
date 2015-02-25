@@ -1374,7 +1374,13 @@ if (SERVER) then
 		local unixTime = os.time();
 		
 		if (dateInfo) then
-			local fileName = dateInfo.day.."-"..dateInfo.month.."-"..dateInfo.year;
+			if (dateInfo.month < 10) then dateInfo.month = "0"..dateInfo.month; end;
+			if (dateInfo.day < 10) then dateInfo.day = "0"..dateInfo.day; end;
+			local fileName = dateInfo.year.."-"..dateInfo.month.."-"..dateInfo.day;
+			
+			if (dateInfo.hour < 10) then dateInfo.hour = "0"..dateInfo.hour; end;
+			if (dateInfo.min < 10) then dateInfo.min = "0"..dateInfo.min; end;
+			if (dateInfo.sec < 10) then dateInfo.sec = "0"..dateInfo.sec; end;
 			local time = dateInfo.hour..":"..dateInfo.min..":"..dateInfo.sec;
 			local logText = time..": "..string.gsub(text, "\n", "");
 
@@ -1399,16 +1405,16 @@ else
 	local cam = cam;
 	local gui = gui;
 
-	Clockwork.BackgroundBlurs = {};
-	Clockwork.RecognisedNames = {};
-	Clockwork.NetworkProxies = {};
-	Clockwork.AccessoryData = {};
+	Clockwork.BackgroundBlurs = Clockwork.BackgroundBlurs or {};
+	Clockwork.RecognisedNames = Clockwork.RecognisedNames or {};
+	Clockwork.NetworkProxies = Clockwork.NetworkProxies or {};
+	Clockwork.AccessoryData = Clockwork.AccessoryData or {};
 	Clockwork.InfoMenuOpen = false;
-	Clockwork.ColorModify = {};
-	Clockwork.ClothesData = {};
-	Clockwork.Cinematics = {};
-	Clockwork.kernel.ESPInfo = {};
-	Clockwork.kernel.Hints = {};
+	Clockwork.ColorModify = Clockwork.ColorModify or {};
+	Clockwork.ClothesData = Clockwork.ClothesData or {};
+	Clockwork.Cinematics = Clockwork.Cinematics or {};
+	Clockwork.kernel.ESPInfo = Clockwork.kernel.ESPInfo or {};
+	Clockwork.kernel.Hints = Clockwork.kernel.Hints or {};
 
 	-- A function to register a network proxy.
 	function Clockwork.kernel:RegisterNetworkProxy(entity, name, Callback)
@@ -1450,6 +1456,17 @@ else
 		--]]
 	
 		return ScreenScale(size);
+	end;
+	
+	-- A function to get a material.
+	function Clockwork.kernel:GetMaterial(materialPath, pngParameters)
+		self.CachedMaterial = self.CachedMaterial or {};
+
+		if (!self.CachedMaterial[materialPath]) then
+			self.CachedMaterial[materialPath] = Material(materialPath, pngParameters);
+		end;
+
+		return self.CachedMaterial[materialPath];
 	end;
 
 	-- A function to get the 3D font size.
@@ -1854,8 +1871,8 @@ else
 			self:DrawInfo("CHARACTER AND ROLEPLAY INFO", x, y + 4, colorInfo, nil, true, function(x, y, width, height)
 				return x, y - height;
 			end);
-		
-			self:DrawSimpleGradientBox(2, x, y + 8, width, height, backgroundColor);
+			
+			SLICED_INFO_MENU_BG:Draw(x, y + 8, width, height, 8, backgroundColor);
 			y = y + height + 16;
 			
 			if (self:CanCreateInfoMenuPanel() and self:IsInfoMenuOpen()) then
@@ -1868,7 +1885,8 @@ else
 				end);
 				
 				self:CreateInfoMenuPanel(menuPanelX, menuPanelY, width);
-				self:DrawSimpleGradientBox(2, Clockwork.InfoMenuPanel.x - 4, Clockwork.InfoMenuPanel.y - 4, Clockwork.InfoMenuPanel:GetWide() + 8, Clockwork.InfoMenuPanel:GetTall() + 8, backgroundColor);
+				
+				SLICED_INFO_MENU_INSIDE:Draw( Clockwork.InfoMenuPanel.x - 4, Clockwork.InfoMenuPanel.y - 4, Clockwork.InfoMenuPanel:GetWide() + 8, Clockwork.InfoMenuPanel:GetTall() + 8, 8, backgroundColor);
 				
 				--[[ Override the menu's width to fit nicely. --]]
 				Clockwork.InfoMenuPanel:SetSize(width, Clockwork.InfoMenuPanel:GetTall());
@@ -2046,13 +2064,9 @@ else
 	function Clockwork.kernel:DrawAdminESP()
 		local colorWhite = Clockwork.option:GetColor("white");
 		local curTime = UnPredictedCurTime();
-		
-		if (!Clockwork.NextGetESPInfo) then
-			Clockwork.NextGetESPInfo = curTime + 1;
-		end;
-		
-		if (curTime >= Clockwork.NextGetESPInfo) then
-			Clockwork.NextGetESPInfo = curTime + 1;
+
+		if (!Clockwork.NextGetESPInfo or curTime >= Clockwork.NextGetESPInfo) then
+			Clockwork.NextGetESPInfo = curTime + (CW_CONVAR_ESPTIME:GetInt() or 1);
 			self.ESPInfo = {};
 			
 			Clockwork.plugin:Call("GetAdminESPInfo", self.ESPInfo);
@@ -2062,7 +2076,34 @@ else
 			local position = v.position:ToScreen();
 			
 			if (position) then
-				self:DrawSimpleText(v.text, position.x, position.y, v.color or colorWhite, 1, 1);
+				if (type(v.text) == "string") then
+					self:DrawSimpleText(v.text, position.x, position.y, v.color or colorWhite, 1, 1);
+				else
+					
+					for k2, v2 in ipairs(v.text) do
+						local text, color, width, height;
+											
+						if (type(v2) == "string") then
+							text = v2;
+							color = v.color;
+							v2 = {text, color};
+						else
+							text = v2[1];
+							color = v2[2];
+						end;
+									
+						if (k2 > 1) then
+							self:OverrideMainFont(Clockwork.option:GetFont("esp_text"));
+							width, height = surface.GetTextSize(text);							
+						else
+							self:OverrideMainFont(false);
+							width, height = surface.GetTextSize(text);
+						end;
+						
+						self:DrawSimpleText(text, position.x, position.y, color or colorWhite, 1, 1);
+						position.y = position.y + height;
+					end;
+				end;			
 			end;
 		end;
 	end;
@@ -2076,7 +2117,6 @@ else
 		local newBarInfo = {
 			progressWidth = progressWidth,
 			drawBackground = true,
-			drawForeground = true,
 			drawProgress = true,
 			cornerSize = 2,
 			maximum = maximum,
@@ -2102,22 +2142,12 @@ else
 		
 		if (!Clockwork.plugin:Call("PreDrawBar", barInfo)) then
 			if (barInfo.drawBackground) then
-				self:DrawTexturedGradientBox(
-					barInfo.cornerSize, barInfo.x, barInfo.y, barInfo.width, barInfo.height, backgroundColor, 50
-				);
-			end;
-			
-			if (barInfo.drawForeground) then
-				self:DrawTexturedGradientBox(
-					barInfo.cornerSize, barInfo.x + 2, barInfo.y + 2, barInfo.width - 4, barInfo.height - 4, foregroundColor, 50
-				);
+				SMALL_BAR_BG:Draw(barInfo.x, barInfo.y, barInfo.width, barInfo.height, barInfo.cornerSize, backgroundColor, 50);
 			end;
 			
 			if (barInfo.drawProgress) then
 				render.SetScissorRect(barInfo.x, barInfo.y, barInfo.x + barInfo.progressWidth, barInfo.y + barInfo.height, true);
-					self:DrawTexturedGradientBox(
-						0, barInfo.x + 2, barInfo.y + 2, barInfo.width, barInfo.height - 4, barInfo.color, 150
-					);
+					SMALL_BAR_FG:Draw(barInfo.x + 2, barInfo.y + 2, barInfo.width - 4, barInfo.height - 4, 3, barInfo.color, 150);
 				render.SetScissorRect(barInfo.x, barInfo.y, barInfo.x + barInfo.progressWidth, barInfo.height, false);
 			end;
 			
@@ -2339,10 +2369,7 @@ else
 			end;
 			
 			if (#information > 0 and boxInfo.drawBackground) then
-				self:DrawTexturedGradientBox(
-					boxInfo.cornerSize, x, y, width, height - ((textHeight + 12) * #subInformation),
-					foregroundColor, 50
-				);
+				SLICED_PLAYER_INFO:Draw(x, y, width, height - ((textHeight + 12) * #subInformation), boxInfo.cornerSize);
 			end;
 			
 			if (#information > 0) then
@@ -2480,11 +2507,12 @@ else
 	-- A function to draw a simple gradient box.
 	function Clockwork.kernel:DrawSimpleGradientBox(cornerSize, x, y, width, height, color, maxAlpha)
 		local gradientAlpha = math.min(color.a, maxAlpha or 100);
+		
 		draw.RoundedBox(cornerSize, x, y, width, height, Color(color.r, color.g, color.b, color.a * 0.75));
 		
 		if (x + cornerSize < x + width and y + cornerSize < y + height) then
 			surface.SetDrawColor(gradientAlpha, gradientAlpha, gradientAlpha, gradientAlpha);
-			surface.SetTexture(Clockwork.DefaultGradient);
+			surface.SetMaterial(self:GetGradientTexture());
 			surface.DrawTexturedRect(x + cornerSize, y + cornerSize, width - (cornerSize * 2), height - (cornerSize * 2));
 		end;
 	end;
@@ -2492,8 +2520,9 @@ else
 	-- A function to draw a textured gradient.
 	function Clockwork.kernel:DrawTexturedGradientBox(cornerSize, x, y, width, height, color, maxAlpha)
 		local gradientAlpha = math.min(color.a, maxAlpha or 100);
-		draw.RoundedBox(cornerSize, x, y, width, height, Color(color.r, color.g, color.b, color.a * 0.75));
 		
+		draw.RoundedBox(cornerSize, x, y, width, height, Color(color.r, color.g, color.b, color.a * 0.75));
+
 		if (x + cornerSize < x + width and y + cornerSize < y + height) then
 			surface.SetDrawColor(gradientAlpha, gradientAlpha, gradientAlpha, gradientAlpha);
 			surface.SetMaterial(self:GetGradientTexture());
@@ -2508,9 +2537,7 @@ else
 		local boxHeight = boxInfo.textHeight + 8;
 		
 		if (boxInfo.drawBackground) then
-			self:DrawTexturedGradientBox(
-				boxInfo.cornerSize, x, y, width, boxHeight, foregroundColor, 50
-			);
+			SLICED_PLAYER_INFO:Draw(x, y, width, boxHeight, 4, foregroundColor, 50);
 		end;
 		
 		self:DrawInfo(text, x + 8, y + (boxHeight / 2), colorInfo, 255, true,
@@ -3633,7 +3660,11 @@ function Clockwork.kernel:IncludePrefixed(fileName)
 		return;
 	end;
 	
-	include(fileName);
+	local success, err = pcall(include, fileName);
+	
+	if (!success) then
+		MsgN("[Clockwork] File System -> "..err);
+	end;
 end;
 
 -- A function to include plugins in a directory.

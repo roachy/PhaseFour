@@ -1,5 +1,5 @@
 --[[ 
-	© 2014 CloudSixteen.com do not share, re-distribute or modify
+	© 2015 CloudSixteen.com do not share, re-distribute or modify
 	without permission of its author (kurozael@gmail.com).
 
 	Clockwork was created by Conna Wiles (also known as kurozael.)
@@ -39,6 +39,7 @@ local math = math;
 local game = game;
 local os = os;
 
+Clockwork.kernel:AddDirectory("materials/clockwork/sliced/");
 Clockwork.kernel:AddDirectory("materials/clockwork/limbs/");
 Clockwork.kernel:AddDirectory("materials/clockwork/donations/");
 Clockwork.kernel:AddDirectory("materials/clockwork/logo/");
@@ -71,6 +72,7 @@ for k, v in pairs(SILKICON_MATERIAL_TABLE)do
 	Clockwork.kernel:AddFile("materials/icon16/"..v..".png");
 end;
 
+Clockwork.kernel:AddFile("materials/SliceTest.png");
 Clockwork.kernel:AddFile("models/humans/female_gestures.ani");
 Clockwork.kernel:AddFile("models/humans/female_gestures.mdl");
 Clockwork.kernel:AddFile("models/humans/female_postures.ani");
@@ -128,7 +130,7 @@ end;
 	This is a hack to allow us to call plugin hooks based
 	on default GMod hooks that are called.
 --]]
-hook.ClockworkCall = hook.Call;
+hook.ClockworkCall = hook.ClockworkCall or hook.Call;
 hook.Timings = {};
 
 function hook.Call(name, gamemode, ...)
@@ -156,7 +158,7 @@ function hook.Call(name, gamemode, ...)
 		end;
 	end;
 	
-	if (value == nil) then
+	if (value == nil or name == THINK_NAME) then
 		local startTime = SysTime();
 			local bStatus, a, b, c = pcall(hook.ClockworkCall, name, gamemode or Clockwork, unpack(arguments));
 		local timeTook = SysTime() - startTime;
@@ -942,8 +944,13 @@ function Clockwork:PlayerCanKnockOnDoor(player, door) return true; end;
 -- Called when a player punches an entity.
 function Clockwork:PlayerPunchEntity(player, entity) end;
 
--- Called when a player orders an item shipment.
-function Clockwork:PlayerOrderShipment(player, itemTable, entity) end;
+--[[
+	Called when a player orders an item shipment.
+	
+	If itemTables is set, the order is a shipment. This means that
+	you should use the itemTables table, and not the itemTable parameter.
+--]]
+function Clockwork:PlayerOrderShipment(player, itemTable, entity, itemTables) end;
 
 -- Called when a player holsters a weapon.
 function Clockwork:PlayerHolsterWeapon(player, itemTable, weapon, bForce) end;
@@ -1468,7 +1475,9 @@ end;
 function Clockwork:PlayerStorageShouldClose(player, storageTable)
 	local entity = player:GetStorageEntity();
 	
-	if (player:IsRagdolled() or !player:Alive() or !entity or (storageTable.distance and player:GetShootPos():Distance(entity:GetPos()) > storageTable.distance)) then
+	if (player:IsRagdolled() or !player:Alive() or (storageTable.entity and !entity)
+	or (storageTable.entity and storageTable.distance
+	and player:GetShootPos():Distance(entity:GetPos()) > storageTable.distance)) then
 		return true;
 	elseif (storageTable.ShouldClose and storageTable.ShouldClose(player, storageTable)) then
 		return true;
@@ -2993,7 +3002,13 @@ function Clockwork:PlayerAdjustPropCostInfo(player, entity, info) end;
 function Clockwork:PlayerAdjustDeathInfo(player, info) end;
 
 -- Called when chat box info should be adjusted.
-function Clockwork:ChatBoxAdjustInfo(info) end;
+function Clockwork:ChatBoxAdjustInfo(info)
+	if (info.class == "ic") then
+		Clockwork.kernel:PrintLog(LOGTYPE_GENERIC, info.speaker:Name().." says: \""..info.text.."\"");
+	elseif (info.class == "looc") then
+		Clockwork.kernel:PrintLog(LOGTYPE_GENERIC, "[LOOC] "..info.speaker:Name()..": "..info.text);
+	end;
+end;
 
 -- Called when a chat box message has been added.
 function Clockwork:ChatBoxMessageAdded(info) end;
@@ -3642,7 +3657,7 @@ end);
 -- LocalPlayerCreated datastream callback.
 Clockwork.datastream:Hook("LocalPlayerCreated", function(player, data)
 	if (IsValid(player) and !player:HasConfigInitialized()) then
-		Clockwork.kernel:CreateTimer("SendCfg"..player:UniqueID(), FrameTime() * 64, 1, function()
+		Clockwork.kernel:CreateTimer("SendCfg"..player:UniqueID(), FrameTime(), 1, function()
 			if (IsValid(player)) then
 				Clockwork.config:Send(player);
 			end;
@@ -4104,7 +4119,7 @@ function entityMeta:EmitHitSound(sound)
 		math.random(100, 150), math.random(150, 170)
 	);
 	
-	timer.Simple(FrameTime() * 8, function()
+	timer.Simple(FrameTime(), function()
 		if (IsValid(self)) then
 			self:EmitSound(sound);
 		end;
@@ -4832,6 +4847,17 @@ function playerMeta:GetItemInstance(uniqueID, itemID)
 	return Clockwork.inventory:FindItemByID(
 		self:GetInventory(), uniqueID, itemID
 	);
+end;
+
+-- A function to take a player's item by ID.
+function playerMeta:TakeItemByID(uniqueID, itemID)
+	local itemTable = self:GetItemInstance(uniqueID, itemID);
+	
+	if (itemTable) then
+		return self:TakeItem(itemTable);
+	else
+		return false;
+	end;
 end;
 
 -- A function to get a player's attribute boosts.

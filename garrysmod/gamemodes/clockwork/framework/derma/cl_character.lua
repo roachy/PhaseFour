@@ -31,6 +31,7 @@ function PANEL:Init()
 		self:SetPos(0, 0);
 		self:SetSize(scrW, scrH);
 		self:SetDrawOnTop(false);
+		self:SetFocusTopLevel(true);
 		self:SetPaintBackground(false);
 		self:SetMouseInputEnabled(true);
 		
@@ -157,8 +158,10 @@ function PANEL:Init()
 		self.cancelButton:SetMouseInputEnabled(true);
 		self.cancelButton:SetPos((scrW * 0.5) - (self.cancelButton:GetWide() / 2), scrH * 0.9);
 		
+		local modelSize = math.min(ScrW() * 0.25, ScrH() * 0.9);
+		
 		self.characterModel = vgui.Create("cwCharacterModel", self);
-		self.characterModel:SetSize(512, 512);
+		self.characterModel:SetSize(modelSize, modelSize);
 		self.characterModel:SetAlpha(0);
 		self.characterModel:SetModel("models/error.mdl");
 		self.createTime = SysTime();
@@ -202,7 +205,7 @@ function PANEL:SetModelPanelModel(model)
 		self.characterModel:SetModel(model);
 	end;
 	
-	local modelPanel = self.characterModel:GetModelPanel();
+	local modelPanel = self.characterModel;
 	local weaponModel = Clockwork.plugin:Call(
 		"GetModelSelectWeaponModel", model
 	);
@@ -226,11 +229,16 @@ function PANEL:ReturnToMainMenu()
 	local panel = Clockwork.character:GetActivePanel();
 	
 	if (panel) then
-		panel:FadeOut(0.5, function()
-			Clockwork.character.activePanel = nil;
-				panel:Remove();
-			self:FadeInTitle();
-		end);
+	--	if (CW_CONVAR_FADEPANEL:GetInt() == 1) then
+			panel:FadeOut(0.5, function()
+				Clockwork.character.activePanel = nil;
+					panel:Remove();
+				self:FadeInTitle();
+			end);
+--		else
+--			Clockwork.character.activePanel = nil;
+	--		panel:Remove();
+--		end;
 	else
 		self:FadeInTitle();
 	end;
@@ -522,6 +530,8 @@ function PANEL:Init()
 	self.characterPanels = {};
 	self.isCharacterList = true;
 	
+	CHAR_LIST = self;
+	
 	Clockwork.character:FadeInNavigation()
 end;
 
@@ -530,7 +540,7 @@ function PANEL:Paint(w, h) end;
 
 -- A function to make the panel fade out.
 function PANEL:FadeOut(speed, Callback)
-	if (self:GetAlpha() > 0 and (!self.animation or !self.animation:Active())) then
+	if (self:GetAlpha() > 0 and CW_CONVAR_FADEPANEL:GetInt() == 1 and (!self.animation or !self.animation:Active())) then
 		self.animation = Derma_Anim("Fade Panel", self, function(panel, animation, delta, data)
 			panel:SetAlpha(255 - (delta * 255));
 			
@@ -560,7 +570,7 @@ end;
 
 -- A function to make the panel fade in.
 function PANEL:FadeIn(speed, Callback)
-	if (self:GetAlpha() == 0 and (!self.animation or !self.animation:Active())) then
+	if (self:GetAlpha() == 0 and CW_CONVAR_FADEPANEL:GetInt() == 1 and (!self.animation or !self.animation:Active())) then
 		self.animation = Derma_Anim("Fade Panel", self, function(panel, animation, delta, data)
 			panel:SetVisible(true);
 			panel:SetAlpha(delta * 255);
@@ -633,8 +643,7 @@ function PANEL:ManageTargets(panel, position, alpha)
 		panel.TargetAlpha = alpha;
 	end;
 	
-	local moveSpeed = math.abs(panel.TargetPosition - position) * 2;
-	local interval = moveSpeed * FrameTime();
+	local interval = 64 * math.EaseInOut(self.easingValue, 0.2, 0.2);
 	
 	panel.TargetPosition = math.Approach(panel.TargetPosition, position, interval);
 	panel.TargetAlpha = math.Approach(panel.TargetAlpha, alpha, interval);
@@ -645,23 +654,32 @@ end;
 -- A function to set the panel's selected index.
 function PANEL:SetSelectedIdx(index)
 	self.selectedIdx = index;
+	self.easingValue = 0;
 end;
 
 -- Called when the previous button is pressed.
 function PANEL:OnPrevious()
 	self.selectedIdx = math.max(self.selectedIdx - 1, 1);
+	self.easingValue = 0;
 	self:MakePopup();
 end;
 
 -- Called when the next button is pressed.
 function PANEL:OnNext()
 	self.selectedIdx = math.min(self.selectedIdx + 1, #self.characterPanels);
+	self.easingValue = 0;
 	self:MakePopup();
 end;
 
 -- Called each frame.
 function PANEL:Think()
 	self:InvalidateLayout(true);
+	
+	if (!self.easingValue) then
+		self.easingValue = 0;
+	end;
+	
+	self.easingValue = math.Approach(self.easingValue, 1, FrameTime());
 	
 	if (self.animation) then self.animation:Run(); end;
 	
@@ -701,8 +719,8 @@ end;
 
 -- Called when the layout should be performed.
 function PANEL:PerformLayout(w, h)
-	self:SetPos(0, (ScrH() / 2) - 256);
-	self:SetSize(ScrW(), 512);
+	self:SetPos(0, 96);
+	self:SetSize(ScrW(), ScrH() - (96 * 2));
 end;
 
 vgui.Register("cwCharacterList", PANEL, "EditablePanel");
@@ -717,31 +735,50 @@ function PANEL:Init()
 	local colorWhite = Clockwork.option:GetColor("white");
 	local buttonX = 20;
 	local buttonY = 0;
+	local labels = {};
+	
+	if (not WOW) then
+		WOW = self;
+	end;
 	
 	self.customData = self:GetParent().customData;
 	self.buttonPanels = {};
 	self:SetPaintBackground(false);
+	
+	Clockwork.plugin:Call("GetCharacterPanelLabels", labels, self.customData);
 	
 	self.nameLabel = vgui.Create("cwLabelButton", self);
 	self.nameLabel:SetDisabled(true);
 	self.nameLabel:SetFont(smallTextFont);
 	self.nameLabel:SetText(string.upper(self.customData.name));
 	self.nameLabel:SizeToContents();
+	self.nameLabel:SetPos(0, 80);
 	
 	self.factionLabel = vgui.Create("cwLabelButton", self);
 	self.factionLabel:SetDisabled(true);
 	self.factionLabel:SetFont(tinyTextFont);
 	self.factionLabel:SetText(string.upper(self.customData.faction));
 	self.factionLabel:SizeToContents();
-	self.factionLabel:SetPos(0, self.nameLabel:GetTall() + 8);
+	self.factionLabel:SetPos(0, self.nameLabel.y + self.nameLabel:GetTall() + 4);
 	
+	local color = Color(255, 255, 255, 255);
+	for k, class in pairs(Clockwork.class:GetAll()) do
+		if (class.factions[1] == self.customData.faction) then
+			color = class.color;
+		end;
+	end;
+	self.factionLabel:OverrideTextColor(color)
+		
 	self.characterModel = vgui.Create("cwCharacterModel", self);
 	self.characterModel:SetModel(self.customData.model);
-	self.characterModel:SetPos(0, self.factionLabel.y + self.factionLabel:GetTall() + 8);
-	self.characterModel:SetSize(256, 256);
-	buttonY = self.characterModel.y + self.characterModel:GetTall() + 8;
+	self.characterModel:SetSize(512, 512);
+	self.characterModel:SetMouseInputEnabled(true);
 	
-	local modelPanel = self.characterModel:GetModelPanel();
+	buttonY = self.factionLabel.y + self.factionLabel:GetTall() + 4;
+	
+	self.characterModel:SetPos(0, buttonY + 24);
+		
+	local modelPanel = self.characterModel;
 	local sequence = Clockwork.plugin:Call(
 		"GetCharacterPanelSequence", modelPanel.Entity, self.customData.charTable
 	);
@@ -755,12 +792,14 @@ function PANEL:Init()
 	self.useButton:SetImage("icon16/tick.png");
 	self.useButton:SetSize(16, 16);
 	self.useButton:SetPos(0, buttonY);
+	self.useButton:SetMouseInputEnabled(true);
 	
 	self.deleteButton = vgui.Create("DImageButton", self);
 	self.deleteButton:SetToolTip("Delete this character.");
 	self.deleteButton:SetImage("icon16/cross.png");
 	self.deleteButton:SetSize(16, 16);
 	self.deleteButton:SetPos(20, buttonY);
+	self.deleteButton:SetMouseInputEnabled(true);
 	
 	Clockwork.plugin:Call(
 		"GetCustomCharacterButtons", self.customData.charTable, buttonsList
@@ -773,6 +812,7 @@ function PANEL:Init()
 			button:SetImage(v.image);
 			button:SetSize(16, 16);
 			button:SetPos(buttonX, buttonY);
+			button:SetMouseInputEnabled(true);
 		self.buttonPanels[#self.buttonPanels + 1] = button;
 		
 		-- Called when the button is clicked.
@@ -808,7 +848,7 @@ function PANEL:Init()
 		});
 	end;
 	
-	local modelPanel = self.characterModel:GetModelPanel();
+	local modelPanel = self.characterModel;
 	
 	-- Called when the character model is clicked.
 	function modelPanel.DoClick(modelPanel)
@@ -862,14 +902,29 @@ function PANEL:Init()
 		maxWidth = self.factionLabel:GetWide();
 	end;
 	
-	self.characterModel:SetPos((maxWidth / 2) - 128, self.characterModel.y);
-	self.factionLabel:SetPos((maxWidth / 2) - (self.factionLabel:GetWide() / 2), self.factionLabel.y);
+	local labelY = self.characterModel.y + self.characterModel:GetTall() + 4;
+	
+	for k, v in pairs(labels) do
+		local label = vgui.Create("cwLabelButton", self);
+		label:SetDisabled(true);
+		label:SetFont(tinyTextFont);
+		label:SetText(string.upper(v.text));
+		label:OverrideTextColor(v.color)
+		label:SizeToContents();
+		label:SetPos((maxWidth / 2) - (label:GetWide()/2), labelY);
+		labelY = labelY + label:GetTall() + 4;
+	end;
+	
+	self.characterModel.x = (maxWidth / 2) - 256;
 	self.nameLabel:SetPos((maxWidth / 2) - (self.nameLabel:GetWide() / 2), self.nameLabel.y);
-	self:SetSize(maxWidth, buttonY + 32);
+	self.factionLabel:SetPos((maxWidth / 2) - (self.factionLabel:GetWide() / 2), self.factionLabel.y);
+	self:SetSize(maxWidth, ScrH());
 	
 	local buttonAddX = ((maxWidth / 2) - (buttonX / 2)) - 10;
-		self.useButton:SetPos(self.useButton.x + buttonAddX, self.useButton.y);
-		self.deleteButton:SetPos(self.deleteButton.x + buttonAddX, self.deleteButton.y);
+	
+	self.useButton:SetPos(self.useButton.x + buttonAddX, self.useButton.y);
+	self.deleteButton:SetPos(self.deleteButton.x + buttonAddX, self.deleteButton.y);
+	
 	for k, v in pairs(self.buttonPanels) do
 		v:SetPos(v.x + buttonAddX, v.y);
 	end;
@@ -888,22 +943,23 @@ end;
 
 -- Called each frame.
 function PANEL:Think()
-	local informationColor = Clockwork.option:GetColor("information");
+	local markupObject = Clockwork.theme:GetMarkupObject();
 	local weaponModel = Clockwork.plugin:Call(
 		"GetCharacterPanelWeaponModel", self, self.customData.charTable
 	);
 	local toolTip = Clockwork.plugin:Call(
 		"GetCharacterPanelToolTip", self, self.customData.charTable
 	);
-	local details = Clockwork.kernel:MarkupTextWithColor("[Details]", informationColor);
 	
-	details = Clockwork.kernel:AddMarkupLine(
-		details, self.customData.details or "This character has no details to display."
+	markupObject:Title("Details");
+	
+	markupObject:Add(
+		self.customData.details or "This character has no details to display."
 	);
 	
 	if (toolTip and toolTip != "") then
-		details = Clockwork.kernel:AddMarkupLine(details, "[Information]", informationColor);
-		details = Clockwork.kernel:AddMarkupLine(details, toolTip);
+		details = markupObject:Title(self.customData.name);
+		details = markupObject:Add(toolTip);
 	end;
 	
 	if (weaponModel) then
@@ -912,7 +968,7 @@ function PANEL:Think()
 		self.characterModel:SetWeaponModel(false);
 	end;
 	
-	self.characterModel:SetDetails(details);
+	self.characterModel:SetDetails(markupObject:GetText());
 end;
 	
 vgui.Register("cwCharacterPanel", PANEL, "DPanel");
@@ -922,20 +978,14 @@ local PANEL = {};
 -- Called when the panel is initialized.
 function PANEL:Init()
 	self:SetPaintBackground(false);
+	self:SetAmbientLight(Color(255, 255, 255, 255));
 	
-	self.modelPanel = vgui.Create("DModelPanel", self);
-	self.modelPanel:SetAmbientLight(Color(255, 255, 255, 255));
-	Clockwork.kernel:CreateMarkupToolTip(self.modelPanel);
-	
-	-- Called when the entity should be laid out.
-	function self.modelPanel.LayoutEntity(modelPanel, entity)
-		modelPanel:RunAnimation();
-	end;
+	Clockwork.kernel:CreateMarkupToolTip(self);
 end;
 
 -- A function to make the panel fade out.
 function PANEL:FadeOut(speed, Callback)
-	if (self:GetAlpha() > 0 and (!self.animation or !self.animation:Active())) then
+	if (self:GetAlpha() > 0 and CW_CONVAR_FADEPANEL:GetInt() == 1 and (!self.animation or !self.animation:Active())) then
 		self.animation = Derma_Anim("Fade Panel", self, function(panel, animation, delta, data)
 			panel:SetAlpha(255 - (delta * 255));
 			
@@ -967,7 +1017,7 @@ end;
 
 -- A function to make the panel fade in.
 function PANEL:FadeIn(speed, Callback)
-	if (self:GetAlpha() == 0 and (!self.animation or !self.animation:Active())) then
+	if (self:GetAlpha() == 0 and CW_CONVAR_FADEPANEL:GetInt() == 1 and (!self.animation or !self.animation:Active())) then
 		self.animation = Derma_Anim("Fade Panel", self, function(panel, animation, delta, data)
 			panel:SetAlpha(delta * 255);
 			
@@ -1000,47 +1050,37 @@ end;
 
 -- A function to set the alpha of the panel.
 function PANEL:SetAlpha(alpha)
-	local color = self.modelPanel:GetColor();
+	local color = self:GetColor();
 	
-	self.modelPanel:SetColor(Color(color.r, color.g, color.b, alpha));
+	self:SetColor(Color(color.r, color.g, color.b, alpha));
 end;
 
 -- A function to get the alpha of the panel.
 function PANEL:GetAlpha(alpha)
-	local color = self.modelPanel:GetColor();
+	local color = self:GetColor();
 	
 	return color.a;
 end;
 
 -- Called each frame.
 function PANEL:Think()
-	local entity = self.modelPanel.Entity;
-	
-	if (IsValid(entity)) then
-		entity:SetPos(Vector(0, 0, 0));
-	end;
+	local entity = self.Entity;
 	
 	if (self.animation) then
 		self.animation:Run();
 	end;
 	
-	entity:ClearPoseParameters();
-	self:InvalidateLayout(true);
-end;
-
--- A function to get the panel's model panel.
-function PANEL:GetModelPanel()
-	return self.modelPanel;
-end;
-
--- Called when the layout should be performed.
-function PANEL:PerformLayout(w, h)
-	self.modelPanel:SetSize(w, h);
+	if (self.forceX) then
+		self.x = self.forceX;
+	end;
+	
+	--entity:ClearPoseParameters();
+	--self:InvalidateLayout(true);
 end;
 
 -- A function to set the model details.
 function PANEL:SetDetails(details)
-	self.modelPanel:SetMarkupToolTip(details);
+	self:SetMarkupToolTip(details);
 end;
 
 -- A function to set the model weapon.
@@ -1060,70 +1100,15 @@ function PANEL:SetWeaponModel(weaponModel)
 	end;
 	
 	self.weaponEntity = ClientsideModel(weaponModel, RENDER_GROUP_OPAQUE_ENTITY);
-	self.weaponEntity:SetParent(self.modelPanel.Entity);
+	self.weaponEntity:SetParent(self.Entity);
 	self.weaponEntity:AddEffects(EF_BONEMERGE);
 end;
 
--- A function to set the model.
-function PANEL:SetModel(model)
-	self.modelPanel:SetModel(model);
-	
-	local entity = ents.CreateClientProp("models/error.mdl");
-		entity:SetAngles(Angle(0, 0, 0));
-		entity:SetPos(Vector(0, 0, 0));
-		entity:SetModel(model);
-		entity:Spawn();
-		entity:Activate();
-	entity:PhysicsInit(SOLID_VPHYSICS);
-	
-	local obbCenter = entity:OBBCenter();
-		obbCenter.z = obbCenter.z * 1.09;
-	local distance = entity:BoundingRadius() * 1.2;
-	
-	self.modelPanel:SetLookAt(obbCenter)
-	self.modelPanel:SetCamPos(
-		obbCenter + Vector(distance * 1.56, distance * 0.31, distance * 0.4)
-	);
-	
-	entity:Remove();
-	
-	if (IsValid(self.modelPanel.Entity)) then
-		local sequence = self.modelPanel.Entity:LookupSequence("idle");
-		local menuSequence = Clockwork.animation:GetMenuSequence(model, true);
-		local leanBackAnims = {"LineIdle01", "LineIdle02", "LineIdle03"};
-		local leanBackAnim = self.modelPanel.Entity:LookupSequence(
-			leanBackAnims[math.random(1, #leanBackAnims)]
-		);
-		
-		if (leanBackAnim > 0) then
-			sequence = leanBackAnim;
-		end;
-		
-		if (menuSequence) then
-			menuSequence = self.modelPanel.Entity:LookupSequence(menuSequence);
-			
-			if (menuSequence > 0) then
-				sequence = menuSequence;
-			end;
-		end;
-		
-		if (sequence <= 0) then
-			sequence = self.modelPanel.Entity:LookupSequence("idle_unarmed");
-		end;
-		
-		if (sequence <= 0) then
-			sequence = self.modelPanel.Entity:LookupSequence("idle1");
-		end;
-		
-		if (sequence <= 0) then
-			sequence = self.modelPanel.Entity:LookupSequence("walk_all");
-		end;
-		
-		self.modelPanel.Entity:ResetSequence(sequence);
-	end;
-end;
-	
-vgui.Register("cwCharacterModel", PANEL, "DPanel");
+PANEL.OnMousePressed = extern_CharModelOnMousePressed;
+PANEL.LayoutEntity = extern_CharModelLayoutEntity;
+PANEL.Init = extern_CharModelInit;
+
+vgui.Register("cwCharacterModel", PANEL, "DModelPanel");
 
 local PANEL = {};
 
@@ -1199,18 +1184,16 @@ function PANEL:Think()
 	self.pointsLabel:SizeToContents();
 	self.addButton:SetPos(self.pointsUsed.x + self.pointsUsed:GetWide() + 8, 0);
 	
-	local informationColor = Clockwork.option:GetColor("information");
+	local markupObject = Clockwork.theme:GetMarkupObject();
 	local attributeName = self.attributeTable.name;
 	local attributeMax = self.totalPoints.."/"..self.attributeTable.maximum;
-	local markupToolTip = Clockwork.kernel:MarkupTextWithColor(
-		"["..attributeName..", "..attributeMax.."]", informationColor
-	);
 	
-	markupToolTip = markupToolTip.."\n"..self.attributeTable.description;
+	markupObject:Title(attributeName..", "..attributeMax);
+	markupObject:Add(self.attributeTable.description);
 	
-	self:SetMarkupToolTip(markupToolTip);
-	self.pointsUsed:SetMarkupToolTip(markupToolTip);
-	self.pointsLabel:SetMarkupToolTip(markupToolTip);
+	self:SetMarkupToolTip(markupObject:GetText());
+	self.pointsUsed:SetMarkupToolTip(markupObject:GetText());
+	self.pointsLabel:SetMarkupToolTip(markupObject:GetText());
 end;
 
 -- A function to add a point.
@@ -1332,7 +1315,7 @@ function PANEL:Paint(w, h) end;
 
 -- A function to make the panel fade out.
 function PANEL:FadeOut(speed, Callback)
-	if (self:GetAlpha() > 0 and (!self.animation or !self.animation:Active())) then
+	if (self:GetAlpha() > 0 and CW_CONVAR_FADEPANEL:GetInt() == 1 and (!self.animation or !self.animation:Active())) then
 		self.animation = Derma_Anim("Fade Panel", self, function(panel, animation, delta, data)
 			panel:SetAlpha(255 - (delta * 255));
 			
@@ -1362,7 +1345,7 @@ end;
 
 -- A function to make the panel fade in.
 function PANEL:FadeIn(speed, Callback)
-	if (self:GetAlpha() == 0 and (!self.animation or !self.animation:Active())) then
+	if (self:GetAlpha() == 0 and CW_CONVAR_FADEPANEL:GetInt() == 1 and (!self.animation or !self.animation:Active())) then
 		self.animation = Derma_Anim("Fade Panel", self, function(panel, animation, delta, data)
 			panel:SetVisible(true);
 			panel:SetAlpha(delta * 255);
@@ -1453,7 +1436,7 @@ function PANEL:Paint(w, h) end;
 
 -- A function to make the panel fade out.
 function PANEL:FadeOut(speed, Callback)
-	if (self:GetAlpha() > 0 and (!self.animation or !self.animation:Active())) then
+	if (self:GetAlpha() > 0 and CW_CONVAR_FADEPANEL:GetInt() == 1 and (!self.animation or !self.animation:Active())) then
 		self.animation = Derma_Anim("Fade Panel", self, function(panel, animation, delta, data)
 			panel:SetAlpha(255 - (delta * 255));
 			
@@ -1483,7 +1466,7 @@ end;
 
 -- A function to make the panel fade in.
 function PANEL:FadeIn(speed, Callback)
-	if (self:GetAlpha() == 0 and (!self.animation or !self.animation:Active())) then
+	if (self:GetAlpha() == 0 and CW_CONVAR_FADEPANEL:GetInt() == 1 and (!self.animation or !self.animation:Active())) then
 		self.animation = Derma_Anim("Fade Panel", self, function(panel, animation, delta, data)
 			panel:SetVisible(true);
 			panel:SetAlpha(delta * 255);
@@ -1720,7 +1703,7 @@ function PANEL:Paint(w, h) end;
 
 -- A function to make the panel fade out.
 function PANEL:FadeOut(speed, Callback)
-	if (self:GetAlpha() > 0 and (!self.animation or !self.animation:Active())) then
+	if (self:GetAlpha() > 0 and CW_CONVAR_FADEPANEL:GetInt() == 1 and (!self.animation or !self.animation:Active())) then
 		self.animation = Derma_Anim("Fade Panel", self, function(panel, animation, delta, data)
 			panel:SetAlpha(255 - (delta * 255));
 			
@@ -1750,7 +1733,7 @@ end;
 
 -- A function to make the panel fade in.
 function PANEL:FadeIn(speed, Callback)
-	if (self:GetAlpha() == 0 and (!self.animation or !self.animation:Active())) then
+	if (self:GetAlpha() == 0 and CW_CONVAR_FADEPANEL:GetInt() == 1 and (!self.animation or !self.animation:Active())) then
 		self.animation = Derma_Anim("Fade Panel", self, function(panel, animation, delta, data)
 			panel:SetVisible(true);
 			panel:SetAlpha(delta * 255);
@@ -1828,7 +1811,7 @@ function PANEL:Init()
  	self.categoryList:SizeToContents();
 	
 	self.settingsForm = vgui.Create("DForm");
-	self.settingsForm:SetName("Settings");
+	self.settingsForm:SetName("Persuasion");
 	self.settingsForm:SetPadding(4);
 	
 	if (#factions > 1) then
@@ -1845,7 +1828,7 @@ function PANEL:Init()
 						self.genderMultiChoice = self.settingsForm:ComboBox("Gender");
 						self.settingsForm:Rebuild();
 					end;
-					
+
 					if (v.singleGender) then
 						self.genderMultiChoice:AddChoice(v.singleGender);
 					else
@@ -1863,7 +1846,7 @@ function PANEL:Init()
 		for k, v in pairs(Clockwork.faction.stored) do
 			if (v.name == factions[1]) then
 				self.genderMultiChoice = self.settingsForm:ComboBox("Gender");
-				
+
 				if (v.singleGender) then
 					self.genderMultiChoice:AddChoice(v.singleGender);
 				else
@@ -1885,11 +1868,31 @@ function PANEL:Init()
 		end;
 	end;
 	
+	self.customChoices = {};
+	Clockwork.plugin:Call("GetPersuasionChoices", self.customChoices);
+				
+	if (#self.customChoices > 0) then
+		self.customPanels = {};
+		for k2, v2 in pairs(self.customChoices) do
+			table.insert(self.customPanels, {v2.name, self.settingsForm:ComboBox(v2.name)});
+			for k3, v3 in ipairs(v2.choices) do
+				self.customPanels[#self.customPanels][2]:AddChoice(v3)
+			end;
+		end;
+	end;
+	
 	self.categoryList:AddItem(self.settingsForm);
 end;
 
 -- Called when the next button is pressed.
 function PANEL:OnNext()
+	self.info.plugin = {};
+	if (#self.customPanels > 0) then
+		for k, v in pairs(self.customPanels) do
+			self.info.plugin[v[1]] = v[2]:GetValue();
+		end;
+	end;
+
 	if (IsValid(self.genderMultiChoice)) then
 		local faction = self.forcedFaction;
 		local gender = self.genderMultiChoice:GetValue();
@@ -1918,7 +1921,7 @@ function PANEL:Paint(w, h) end;
 
 -- A function to make the panel fade out.
 function PANEL:FadeOut(speed, Callback)
-	if (self:GetAlpha() > 0 and (!self.animation or !self.animation:Active())) then
+	if (self:GetAlpha() > 0 and CW_CONVAR_FADEPANEL:GetInt() == 1 and (!self.animation or !self.animation:Active())) then
 		self.animation = Derma_Anim("Fade Panel", self, function(panel, animation, delta, data)
 			panel:SetAlpha(255 - (delta * 255));
 			
@@ -1948,7 +1951,7 @@ end;
 
 -- A function to make the panel fade in.
 function PANEL:FadeIn(speed, Callback)
-	if (self:GetAlpha() == 0 and (!self.animation or !self.animation:Active())) then
+	if (self:GetAlpha() == 0 and CW_CONVAR_FADEPANEL:GetInt() == 1 and (!self.animation or !self.animation:Active())) then
 		self.animation = Derma_Anim("Fade Panel", self, function(panel, animation, delta, data)
 			panel:SetVisible(true);
 			panel:SetAlpha(delta * 255);

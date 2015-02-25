@@ -6,6 +6,11 @@
 	http://cloudsixteen.com/license/clockwork.html
 --]]
 
+if (Clockwork and Clockwork.config) then
+	ErrorNoHalt("[Clockwork] Clockwork does not currently support AutoRefresh but is being worked on.\n");
+	return;
+end;
+
 local AddCSLuaFile = AddCSLuaFile;
 local IsValid = IsValid;
 local pairs = pairs;
@@ -24,7 +29,7 @@ Clockwork.Email = "kurozael@gmail.com";
 Clockwork.Name = "Clockwork";
 
 --[[ Check if we are using the right CloudAuthX version. --]]
-if (SERVER and CloudAuthX.GetVersion() < 5) then
+if (SERVER and CloudAuthX.GetVersion() < 12) then
 	for i = 1, 3 do
 		Error("[CloudAuthX] Clockwork requires an updated CloudAuthX .dll or .so!\n");
 	end;
@@ -74,10 +79,12 @@ cwPlayer, cwTeam, cwFile = player, team, file;
 _player, _team, _file = player, team, file;
 
 --[[ These are libraries that we want to load before any others. --]]
-Clockwork.kernel:IncludePrefixed("libraries/sv_file.lua");
+Clockwork.kernel:IncludePrefixed("libraries/server/sv_file.lua");
 
 if (SERVER) then CloudAuthX.Authenticate(); end;
 
+Clockwork.kernel:IncludeDirectory("libraries/server", true);
+Clockwork.kernel:IncludeDirectory("libraries/client", true);
 Clockwork.kernel:IncludeDirectory("libraries/", true);
 Clockwork.kernel:IncludeDirectory("language/", true);
 Clockwork.kernel:IncludeDirectory("directory/", true);

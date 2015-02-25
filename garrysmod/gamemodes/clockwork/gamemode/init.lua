@@ -6,11 +6,32 @@
 	http://cloudsixteen.com/license/clockwork.html
 --]]
 
---[[ Require the CloudAuthX authentication system. --]]
-require("cloudauthx");
+if (Clockwork and Clockwork.config) then
+	ErrorNoHalt("[Clockwork] Clockwork does not currently support AutoRefresh but is being worked on.\n");
+	return;
+end;
+
+local caxVersion = file.Read("cax.txt", "DATA");
+local requireName = "cloudauthx";
+if (caxVersion != "" and tonumber(caxVersion)) then
+ local fileName = caxVersion;
+ 
+ if (system.IsLinux()) then
+ fileName = "gmsv_cloudauthx_"..fileName.."_linux.dll";
+ else
+ fileName = "gmsv_cloudauthx_"..fileName.."_win32.dll";
+ end;
+ 
+ if (file.Exists("lua/bin/"..fileName, "GAME")) then
+ requireName = "cloudauthx_"..caxVersion;
+ end;
+end;
+require(requireName);
 
 if (system.IsLinux()) then
 	require("mysqloo");
+else
+	require("tmysql4");
 end;
 
 AddCSLuaFile("cl_init.lua");

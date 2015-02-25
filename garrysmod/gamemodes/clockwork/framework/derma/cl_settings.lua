@@ -22,9 +22,9 @@ function PANEL:Init()
 	self:SetSize(Clockwork.menu:GetWidth(), Clockwork.menu:GetHeight());
 	
 	self.panelList = vgui.Create("cwPanelList", self);
- 	self.panelList:SetPadding(2);
- 	self.panelList:SetSpacing(2);
- 	self.panelList:SizeToContents();
+ 	self.panelList:SetPadding(4);
+ 	self.panelList:SetSpacing(4);
+ 	self.panelList:StretchToParent(4, 4, 4, 4);
 	self.panelList:EnableVerticalScrollbar();
 	
 	self:Rebuild();
@@ -93,6 +93,20 @@ function PANEL:Rebuild()
 					panel = form:TextEntry(v2.text, v2.conVar);
 				elseif (v2.class == "checkBox") then
 					panel = form:CheckBox(v2.text, v2.conVar);
+				elseif (v2.class == "colorMixer") then
+					local Mixer = vgui.Create("DColorMixer");
+					local label = vgui.Create("DLabel");
+					label:SetText(v2.text);
+					Mixer:Dock(FILL);
+					Mixer:SetPalette(true);
+					Mixer:SetAlphaBar(true);
+					Mixer:SetWangs(true);
+					Mixer:SetConVarR(v2.conVar.."R")
+					Mixer:SetConVarG(v2.conVar.."G")
+					Mixer:SetConVarB(v2.conVar.."B")
+					Mixer:SetConVarA(v2.conVar.."A")
+					form:AddItem(label);
+					form:AddItem(Mixer);
 				end;
 				
 				if (IsValid(panel)) then
@@ -126,20 +140,14 @@ function PANEL:OnSelected() self:Rebuild(); end;
 
 -- Called when the layout should be performed.
 function PANEL:PerformLayout(w, h)
-	self.panelList:StretchToParent(4, 28, 4, 4);
-	self:SetSize(w, math.min(self.panelList.pnlCanvas:GetTall() + 32, ScrH() * 0.75));
+	--self.panelList:StretchToParent(4, 4, 4, 4);
+	--self:SetSize(w, math.min(self.panelList.pnlCanvas:GetTall() + 32, ScrH() * 0.75));
 end;
 
 -- Called when the panel is painted.
 function PANEL:Paint(w, h)
-	derma.SkinHook("Paint", "Frame", self, w, h);
-	
+	DERMA_SLICED_BG:Draw(0, 0, w, h, 8, COLOR_WHITE);
 	return true;
-end;
-
--- Called each frame.
-function PANEL:Think()
-	self:InvalidateLayout(true);
 end;
 
 vgui.Register("cwSettings", PANEL, "EditablePanel");

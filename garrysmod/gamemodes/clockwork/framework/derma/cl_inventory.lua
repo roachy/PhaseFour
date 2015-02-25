@@ -28,7 +28,7 @@ function PANEL:Init()
  	self.equipmentList:SetPadding(2);
  	self.equipmentList:SetSpacing(2);
 	
-	self.columnSheet = vgui.Create("DColumnSheet", self);
+	self.columnSheet = vgui.Create("cwColumnSheet", self);
 	self.columnSheet.Navigation:SetWidth(150);
 	self.columnSheet:AddSheet(Clockwork.option:GetKey("name_inventory"), self.inventoryList, "icon16/box.png");
 	self.columnSheet:AddSheet("Equipment", self.equipmentList, "icon16/shield.png");
@@ -39,7 +39,7 @@ end;
 
 -- Called to by the menu to get the width of the panel.
 function PANEL:GetMenuWidth()
-	return ScrW() * 0.6;
+	return ScrW() * 0.5;
 end;
 
 -- A function to handle unequipping for the panel.
@@ -226,15 +226,14 @@ function PANEL:OnSelected() self:Rebuild(); end;
 -- Called when the layout should be performed.
 function PANEL:PerformLayout(w, h)
 	self:SetSize(w, ScrH() * 0.75);
-	self.columnSheet:StretchToParent(4, 28, 4, 4);
+	self.columnSheet:StretchToParent(4, 4, 4, 4);
 	self.inventoryList:StretchToParent(4, 4, 4, 4);
 	self.equipmentList:StretchToParent(4, 4, 4, 4);
 end;
 
 -- Called when the panel is painted.
 function PANEL:Paint(w, h)
-	derma.SkinHook("Paint", "Frame", self, w, h);
-	
+	--DERMA_SLICED_BG:Draw(0, 0, w, h, 8, COLOR_WHITE);
 	return true;
 end;
 
@@ -313,7 +312,7 @@ local PANEL = {};
 -- Called when the panel is initialized.
 function PANEL:Init()
 	local itemData = self:GetParent().itemData;
-	self:SetSize(40, 40);
+	self:SetSize(48, 48);
 	self.itemTable = itemData.itemTable;
 	self.spawnIcon = Clockwork.kernel:CreateMarkupToolTip(vgui.Create("cwSpawnIcon", self));
 	
@@ -335,7 +334,7 @@ function PANEL:Init()
 	
 	local model, skin = Clockwork.item:GetIconInfo(self.itemTable);
 		self.spawnIcon:SetModel(model, skin);
-		self.spawnIcon:SetSize(40, 40);
+		self.spawnIcon:SetSize(48, 48);
 	self.cachedInfo = {model = model, skin = skin};
 end;
 
@@ -448,6 +447,16 @@ end;
 
 -- Called each frame.
 function PANEL:Think()
+	if (!self.nextUpdateContents) then
+		self.nextUpdateContents = CurTime() + 0.1;
+	end;
+	
+	if (CurTime() < self.nextUpdateContents) then
+		return;
+	end;
+	
+	self.nextUpdateContents = nil;
+	
 	local inventorySpace = Clockwork.inventory:CalculateSpace(
 		Clockwork.inventory:GetClient()
 	);
