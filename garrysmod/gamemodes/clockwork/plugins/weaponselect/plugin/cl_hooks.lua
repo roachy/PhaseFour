@@ -107,11 +107,12 @@ function cwWeaponSelect:HUDPaintImportant()
 		
 		for k, v in pairs(beforeWeapons) do
 			local weaponAlpha = math.min((255 / weaponLimit) * k, self.displayAlpha);
-			
 			y = Clockwork.kernel:DrawInfo(
 				string.upper(self:GetWeaponPrintName(v)), x, y, colorWhite, weaponAlpha, true,
 				function(x, y, width, height)
-					--SLICED_SMALL_TINT:Draw(x - 2, y - 2, 128, height + 2, 4, Color(255, 255, 255, weaponAlpha));
+					Clockwork.kernel:DrawGradient(
+						GRADIENT_RIGHT, x - 2, y - 1, 128, height + 2, Color(100, 100, 100, weaponAlpha)
+					);
 					
 					return x, y;
 				end
@@ -127,9 +128,11 @@ function cwWeaponSelect:HUDPaintImportant()
 		y = Clockwork.kernel:DrawInfo(
 			currentWeaponName, x, y, colorWhite, self.displayAlpha, true,
 			function(x, y, width, height)
-				SLICED_SMALL_TINT:Draw(x - 8, y - 8, width + 16, height + 16, 4, Color(
-					informationColor.r, informationColor.g, informationColor.b, self.displayAlpha
-				));
+				Clockwork.kernel:DrawGradient(
+					GRADIENT_RIGHT, x - 2, y - 1, 128, height + 2, Color(
+						informationColor.r, informationColor.g, informationColor.b, self.displayAlpha
+					)
+				);
 				
 				return x, y;
 			end
@@ -144,7 +147,9 @@ function cwWeaponSelect:HUDPaintImportant()
 				y = Clockwork.kernel:DrawInfo(
 					"There are no other weapons.", x, y, colorWhite, self.displayAlpha, true,
 					function(x, y, width, height)
-						--SLICED_SMALL_TINT:Draw(x - 2, y - 2, 128, height + 2, 4, Color(255, 255,255, self.displayAlpha));
+						Clockwork.kernel:DrawGradient(
+							GRADIENT_RIGHT, x - 2, y - 1, 128, height + 2, Color(100, 100, 100, self.displayAlpha)
+						);
 						
 						return x, y;
 					end
@@ -156,11 +161,12 @@ function cwWeaponSelect:HUDPaintImportant()
 	if (#newWeapons > 1) then
 		for k, v in pairs(afterWeapons) do
 			local weaponAlpha = math.min(255 - ((255 / weaponLimit) * k), self.displayAlpha);
-			
 			y = Clockwork.kernel:DrawInfo(
 				string.upper(self:GetWeaponPrintName(v)), x, y, colorWhite, weaponAlpha, true,
 				function(x, y, width, height)
-					--SLICED_SMALL_TINT:Draw(x - 2, y - 2, 128, height + 2, 4, Color(255, 255,255, weaponAlpha));
+					Clockwork.kernel:DrawGradient(
+						GRADIENT_RIGHT, x - 2, y - 1, 128, height + 2, Color(100, 100, 100, weaponAlpha)
+					);
 					
 					return x, y;
 				end

@@ -50,7 +50,6 @@ function ENT:MakeChatBubble()
 	self.cwChatBubble = ents.Create("cw_chatbubble");
 	self.cwChatBubble:SetParent(self);
 	self.cwChatBubble:SetPos(self:GetPos() + Vector(0, 0, 90));
-	self.cwChatBubble:SetNWEntity("salesman", self);
 	self.cwChatBubble:Spawn();
 end;
 

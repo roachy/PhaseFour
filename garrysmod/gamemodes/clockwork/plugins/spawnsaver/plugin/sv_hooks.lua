@@ -11,7 +11,6 @@ function cwSpawnSaver:PlayerCharacterUnloaded(player)
 	if (Clockwork.config:Get("spawn_where_left"):Get() and player:Alive()) then
 		local position = player:GetPos();
 		local posTable = {
-			map = game.GetMap(),
 			x = position.x,
 			y = position.y,
 			z = position.z
@@ -27,10 +26,8 @@ function cwSpawnSaver:PostPlayerSpawn(player, bLightSpawn, bChangeClass, bFirstS
 		local spawnPos = player:GetCharacterData("SpawnPoint");
 		
 		if (spawnPos and Clockwork.config:Get("spawn_where_left"):Get()) then
-			if (spawnPos.map == game.GetMap()) then
-				player:SetPos(Vector(spawnPos.x, spawnPos.y, spawnPos.z));
-				player:SetCharacterData("SpawnPoint", nil);
-			end;
+			player:SetCharacterData("SpawnPoint", nil);
+			player:SetPos(Vector(spawnPos.x, spawnPos.y, spawnPos.z));
 		end;
 	end;
 end;
